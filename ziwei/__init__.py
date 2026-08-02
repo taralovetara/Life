@@ -14,8 +14,9 @@ Usage:
 from .calculator import build_chart
 from .scorer import score_all_palaces, score_palace, score_life_aspects, score_life_aspects_normalized
 from .timeline import get_dajun_sequence, generate_timeline, score_dajun, score_dajun_with_liunian, get_liunian_sihua
+from .stock_screener import stock_score, batch_screen, print_report, print_ranking
 
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __all__ = [
     'build_chart',
     'score_all_palaces', 'score_palace',
@@ -23,4 +24,5 @@ __all__ = [
     'get_dajun_sequence', 'generate_timeline',
     'score_dajun', 'score_dajun_with_liunian',
     'get_liunian_sihua',
+    'stock_score', 'batch_screen', 'print_report', 'print_ranking',
 ]
