@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f0f1a;
+    font-family: 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+    color: #e0e0e0;
+    padding: 40px 20px;
+    min-width: 900px;
+  }
+  h1 {
+    text-align: center;
+    color: #ffd700;
+    font-size: 28px;
+    margin-bottom: 8px;
+    letter-spacing: 4px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #888;
+    font-size: 14px;
+    margin-bottom: 40px;
+  }
+
+  .flow-container {
+    max-width: 880px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  /* --- Generic node --- */
+  .node {
+    border-radius: 12px;
+    padding: 18px 28px;
+    text-align: center;
+    position: relative;
+    width: 100%;
+    max-width: 780px;
+  }
+  .node-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .node-detail {
+    font-size: 13px;
+    color: #bbb;
+    line-height: 1.6;
+  }
+  .node-detail code {
+    background: rgba(255,255,255,0.08);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #aed581;
+  }
+
+  /* --- Stage colors --- */
+  .stage-input   { background: #1a237e; border: 2px solid #42a5f5; }
+  .stage-input .node-title { color: #64b5f6; }
+  .stage-calendar { background: #1b5e20; border: 2px solid #66bb6a; }
+  .stage-calendar .node-title { color: #81c784; }
+  .stage-ju      { background: #4a148c; border: 2px solid #ab47bc; }
+  .stage-ju .node-title { color: #ce93d8; }
+  .stage-plate   { background: #0d47a1; border: 2px solid #1e88e5; }
+  .stage-plate .node-title { color: #42a5f5; }
+  .stage-grid    { background: #b71c1c; border: 2px solid #ef5350; }
+  .stage-grid .node-title { color: #ef9a9a; }
+  .stage-calc    { background: #e65100; border: 2px solid #ff9800; }
+  .stage-calc .node-title { color: #ffcc80; }
+  .stage-score   { background: #004d40; border: 2px solid #26a69a; }
+  .stage-score .node-title { color: #80cbc4; }
+  .stage-decision{ background: #f57f17; border: 2px solid #fdd835; }
+  .stage-decision .node-title { color: #fff176; }
+
+  /* --- Arrow --- */
+  .arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 0;
+  }
+  .arrow-shaft {
+    width: 3px;
+    height: 28px;
+    background: linear-gradient(to bottom, #555, #ffd700);
+    border-radius: 2px;
+  }
+  .arrow-label {
+    font-size: 11px;
+    color: #999;
+    margin-top: 2px;
+    font-style: italic;
+  }
+
+  /* --- Plate sub-nodes --- */
+  .plate-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .plate-item {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 10px 14px;
+    text-align: left;
+  }
+  .plate-item .pi-title {
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .plate-item .pi-detail {
+    font-size: 11px;
+    color: #aaa;
+    margin-top: 3px;
+  }
+  .plate-item .pi-cycle {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-top: 4px;
+  }
+  .cycle-slow { background: #1b5e20; color: #a5d6a7; }
+  .cycle-fast { background: #b71c1c; color: #ef9a9a; }
+
+  /* --- Grid visual --- */
+  .jiugong-visual {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin-top: 10px;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .jg-cell {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 8px 4px;
+    text-align: center;
+    font-size: 11px;
+  }
+  .jg-cell .jg-pos { color: #ffd700; font-weight: 700; font-size: 12px; }
+  .jg-cell .jg-content { color: #aaa; margin-top: 2px; }
+  .jg-center { background: rgba(255,215,0,0.08); border-color: #ffd700; }
+
+  /* --- Calc sub-nodes --- */
+  .calc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .calc-item {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+  }
+  .calc-item .ci-title { font-size: 13px; font-weight: 700; }
+  .calc-item .ci-detail { font-size: 11px; color: #aaa; margin-top: 3px; }
+
+  /* --- Formula --- */
+  .formula-box {
+    background: rgba(255,215,0,0.08);
+    border: 1px dashed #ffd700;
+    border-radius: 8px;
+    padding: 12px 20px;
+    margin-top: 10px;
+    text-align: center;
+    font-size: 15px;
+    color: #ffd700;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  /* --- Decision bars --- */
+  .decision-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .dbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .dbar-label { width: 80px; text-align: right; color: #ccc; }
+  .dbar-track {
+    flex: 1;
+    height: 24px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .dbar-fill {
+    height: 100%;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding-left: 8px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .bar-fire { background: linear-gradient(90deg, #ff5722, #ff9800); color: #fff; }
+  .bar-green { background: linear-gradient(90deg, #2e7d32, #66bb6a); color: #fff; }
+  .bar-yellow { background: linear-gradient(90deg, #f57f17, #fdd835); color: #333; }
+  .bar-orange { background: linear-gradient(90deg, #e65100, #ff9800); color: #fff; }
+  .bar-red { background: linear-gradient(90deg, #b71c1c, #ef5350); color: #fff; }
+
+  /* --- Legend at bottom --- */
+  .legend {
+    margin-top: 40px;
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #999;
+  }
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+
+<h1>奇門遁甲 完整計算流程</h1>
+<p class="subtitle">Qi Men Dun Jia &mdash; From Datetime to Decision</p>
+
+<div class="flow-container">
+
+  <!-- 1. INPUT -->
+  <div class="node stage-input">
+    <div class="node-title">1. 時間輸入</div>
+    <div class="node-detail">
+      唯一輸入：<code>datetime</code> &rarr; 例如 <code>2026-08-03 01:44</code>
+    </div>
+  </div>
+
+  <div class="arrow"><div class="arrow-shaft"></div><div class="arrow-label">解析</div></div>
+
+  <!-- 2. CALENDAR -->
+  <div class="node stage-calendar">
+    <div class="node-title">2. 日曆計算</div>
+    <div class="node-detail">
+      <code>JDN 公式</code> &rarr; 日干支（戊辰）&nbsp;&nbsp;|&nbsp;&nbsp;
+      <code>hour &rarr; 地支</code> &rarr; 時辰干支（癸丑）<br>
+      時辰天干 = 癸 &nbsp;|&nbsp; 時辰地支 = 丑 &nbsp;|&nbsp; 旬首 = 甲辰 &rarr; 值符星 = 天心
+    </div>
+  </div>
+
+  <div class="arrow"><div class="arrow-shaft"></div><div class="arrow-label">確定局數</div></div>
+
+  <!-- 3. JIEQI & JU -->
+  <div class="node stage-ju">
+    <div class="node-title">3. 節氣 &amp; 局數</div>
+    <div class="node-detail">
+      日期 &rarr; 當前節氣（大暑）&nbsp;&rarr;&nbsp; base 局數（7）&nbsp;&rarr;&nbsp; 元（下元，第 10-15 日）<br>
+      <code>陰遁5局</code> &mdash; 決定地盤飛布方向（逆飛 9&rarr;1）
+    </div>
+  </div>
+
+  <div class="arrow"><div class="arrow-shaft"></div><div class="arrow-label">四層輪盤</div></div>
+
+  <!-- 4. FOUR PLATES -->
+  <div class="node stage-plate">
+    <div class="node-title">4. 四層輪盤飛布</div>
+    <div class="plate-grid">
+      <div class="plate-item">
+        <div class="pi-title" style="color:#66bb6a;">地盤 Earth Plate</div>
+        <div class="pi-detail">六儀三奇（戊己庚辛壬癸丁丙乙）從局數宮開始排入九宮</div>
+        <div class="pi-detail">驅動：<code>節氣 + 元 + 陰陽遁</code></div>
+        <span class="pi-cycle cycle-slow">每 ~5 日一轉</span>
+      </div>
+      <div class="plate-item">
+        <div class="pi-title" style="color:#42a5f5;">天盤 Heaven Plate</div>
+        <div class="pi-detail">值符星 + 九星 + 天干，飛到時辰天干在地盤嘅位置</div>
+        <div class="pi-detail">驅動：<code>時辰天干</code></div>
+        <span class="pi-cycle cycle-fast">每 2 小時一轉</span>
+      </div>
+      <div class="plate-item">
+        <div class="pi-title" style="color:#ab47bc;">人盤 Human Plate</div>
+        <div class="pi-detail">值使門 + 八門，飛到時辰地支對應嘅宮位</div>
+        <div class="pi-detail">驅動：<code>時辰地支</code></div>
+        <span class="pi-cycle cycle-fast">每 2 小時一轉</span>
+      </div>
+      <div class="plate-item">
+        <div class="pi-title" style="color:#ef5350;">神盤 Spirit Plate</div>
+        <div class="pi-detail">值符神 + 八神，從值符星所在宮位開始排</div>
+        <div class="pi-detail">驅動：<code>值符星位置</code></div>
+        <span class="pi-cycle cycle-fast">每 2 小時一轉</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow"><div class="arrow-shaft"></div><div class="arrow-label">疊加</div></div>
+
+  <!-- 5. NINE PALACE GRID -->
+  <div class="node stage-grid">
+    <div class="node-title">5. 交匯 &rarr; 落入九宮格</div>
+    <div class="node-detail">四層輪盤疊加到 3&times;3 空間網格，每格裝入 5 個元素：</div>
+    <div class="jiugong-visual">
+      <div class="jg-cell"><div class="jg-pos">巽4</div><div class="jg-content">天蓬/生門/白虎<br>天壬/地己</div></div>
+      <div class="jg-cell"><div class="jg-pos">離9</div><div class="jg-content">天心/傷門/值符<br>天乙/地癸</div></div>
+      <div class="jg-cell"><div class="jg-pos">坤2</div><div class="jg-content">天任/休門/九地<br>天丁/地辛</div></div>
+      <div class="jg-cell"><div class="jg-pos">震3</div><div class="jg-content">天英/景門/玄武<br>天癸/地庚</div></div>
+      <div class="jg-cell jg-center"><div class="jg-pos">中5</div><div class="jg-content">天芮<br>天辛/地戊</div></div>
+      <div class="jg-cell"><div class="jg-pos">兌7</div><div class="jg-content">天輔/開門/太陰<br>天己/地丙</div></div>
+      <div class="jg-cell"><div class="jg-pos">艮8</div><div class="jg-content">天禽/杜門/騰蛇<br>天戊/地丁</div></div>
+      <div class="jg-cell"><div class="jg-pos">坎1</div><div class="jg-content">天柱/死門/九天<br>天丙/地壬</div></div>
+      <div class="jg-cell"><div class="jg-pos">乾6</div><div class="jg-content">天沖/驚門/六合<br>天庚/地乙</div></div>
+    </div>
+    <div class="node-detail" style="margin-top:8px; font-size:11px; color:#888;">以 2026-08-03 01:44 丑時為例</div>
+  </div>
+
+  <div class="arrow"><div class="arrow-shaft"></div><div class="arrow-label">格內運算</div></div>
+
+  <!-- 6. PER-PALACE CALC -->
+  <div class="node stage-calc">
+    <div class="node-title">6. 每格內部運算（三項 variable 計算）</div>
+    <div class="calc-grid">
+      <div class="calc-item">
+        <div class="ci-title">星 / 門 / 神分數</div>
+        <div class="ci-detail">每個元素帶基礎分數<br>例：天輔 +2.5<br>開門 +3.0<br>太陰 +1.5</div>
+      </div>
+      <div class="calc-item">
+        <div class="ci-title">五行生剋</div>
+        <div class="ci-detail">天干五行 vs 地干五行<br>例：己(土) vs 丙(火)<br>火生土 &rarr; +0.8</div>
+      </div>
+      <div class="calc-item">
+        <div class="ci-title">格局偵測</div>
+        <div class="ci-detail">天干+地干+門+神<br>嘅特定組合觸發<br>例：乙+辛 &rarr; 青龍逃走 -3</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow"><div class="arrow-shaft"></div><div class="arrow-label">加總</div></div>
+
+  <!-- 7. SCORING -->
+  <div class="node stage-score">
+    <div class="node-title">7. 評分</div>
+    <div class="formula-box">
+      宮位總分 = 星分 + 門分 + 神分 + 五行生剋係數 + 格局加減分
+    </div>
+    <div class="node-detail" style="margin-top:8px;">
+      以兌7宮為例：(+2.5) + (+3.0) + (+1.5) + (+0.8) + (0.0) = <b style="color:#ffd700;">+7.8</b>
+    </div>
+  </div>
+
+  <div class="arrow"><div class="arrow-shaft"></div><div class="arrow-label">用神取用</div></div>
+
+  <!-- 8. DECISION -->
+  <div class="node stage-decision">
+    <div class="node-title">8. 決策</div>
+    <div class="node-detail">根據問題揀用神宮位 &rarr; 睇分數 &rarr; 落閾值</div>
+    <div class="decision-bars">
+      <div class="dbar">
+        <div class="dbar-label">&ge; +5.0</div>
+        <div class="dbar-track"><div class="dbar-fill bar-fire" style="width:100%;">強烈看多，加倉</div></div>
+      </div>
+      <div class="dbar">
+        <div class="dbar-label">&ge; +2.0</div>
+        <div class="dbar-track"><div class="dbar-fill bar-green" style="width:75%;">偏多，可買入</div></div>
+      </div>
+      <div class="dbar">
+        <div class="dbar-label">&ge; -2.0</div>
+        <div class="dbar-track"><div class="dbar-fill bar-yellow" style="width:50%;">觀望，唔操作</div></div>
+      </div>
+      <div class="dbar">
+        <div class="dbar-label">&ge; -5.0</div>
+        <div class="dbar-track"><div class="dbar-fill bar-orange" style="width:30%;">偏空，減倉</div></div>
+      </div>
+      <div class="dbar">
+        <div class="dbar-label">&lt; -5.0</div>
+        <div class="dbar-track"><div class="dbar-fill bar-red" style="width:15%;">強烈看空，清倉</div></div>
+      </div>
+    </div>
+    <div class="node-detail" style="margin-top:10px;">
+      例：Long Gold &rarr; 用神=開門 &rarr; 開門喺兌7宮 &rarr; <b style="color:#ffd700;">+7.8 &rarr; 強烈看多，加倉</b>
+    </div>
+  </div>
+
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#42a5f5;"></div>佈局層（飛入）</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ff9800;"></div>運算層（格內計算）</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#66bb6a;"></div>慢變量（~5日）</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ef5350;"></div>快變量（2小時）</div>
+</div>
+
+</body>
+</html>
