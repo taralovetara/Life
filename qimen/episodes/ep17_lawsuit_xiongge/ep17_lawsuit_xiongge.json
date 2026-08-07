@@ -1,0 +1,285 @@
+{
+  "episode": 17,
+  "title": "官司訴訟預測 + 常用凶格",
+  "lawsuit_yongshen": {
+    "值符": {
+      "represents": "原告",
+      "detail": "值符所在宮位代表原告一方"
+    },
+    "天乙": {
+      "represents": "被告",
+      "detail": "值符落宮原地盤天干的天乙太乙 → 即值符落宮地盤天干本身"
+    },
+    "開門": {
+      "represents": "法院/法官",
+      "detail": "開門所在宮位代表法院或法官的態度"
+    },
+    "六合": {
+      "represents": "證人/證據",
+      "detail": "六合所在宮位代表證人和證據的情況"
+    },
+    "景門": {
+      "represents": "入稟狀/訴狀",
+      "detail": "景門所在宮位代表入稟狀的質量"
+    },
+    "驚門": {
+      "represents": "律師",
+      "detail": "驚門所在宮位代表律師的能力和表現"
+    }
+  },
+  "judgment_method": {
+    "step1_值符vs天乙": {
+      "win": "值符宮剋天乙宮 → 原告贏",
+      "lose": "天乙宮剋值符宮 → 被告贏（原告輸）",
+      "equal": "比宮旺衰，旺者贏"
+    },
+    "step2_日干vs時干": {
+      "consistency": "日干宮剋時干宮 → 與步驟1互相印證",
+      "note": "兩步結果一致 → 判斷更可靠"
+    },
+    "step3_開門取向": {
+      "rule": "開門宮生值符宮 → 法院傾向原告",
+      "rule2": "開門宮生天乙宮 → 法院傾向被告",
+      "neutral": "開門宮不生任何一方 → 法院中立"
+    }
+  },
+  "fanyin_lawsuit": {
+    "meaning": "不會審一次就結束",
+    "detail": [
+      "一審結束後，輸的一方一定會上訴",
+      "事情會反反覆覆",
+      "不會那麼快有最終結果"
+    ]
+  },
+  "xiong_ge": {
+    "飛干格": {
+      "condition": "日干 + 庚（天盤日干落在地盤庚之上）",
+      "meaning": "遭遇不測、身陷困境",
+      "total_combinations": 10
+    },
+    "伏干格": {
+      "condition": "庚 + 日干（天盤庚落在地盤日干之上）",
+      "meaning": "遭遇不測、身陷困境 + 失去行動自由",
+      "total_combinations": 10
+    },
+    "刑格": {
+      "condition": "庚 + 己（天盤庚落在地盤己之上）",
+      "meaning": "阻滯困難、官司破財患病",
+      "total_combinations": 1
+    }
+  },
+  "liuyi_xingxing": [
+    {
+      "tiangan": "壬",
+      "palace": 4,
+      "palace_name": "巽四宮"
+    },
+    {
+      "tiangan": "癸",
+      "palace": 4,
+      "palace_name": "巽四宮"
+    },
+    {
+      "tiangan": "辛",
+      "palace": 9,
+      "palace_name": "離九宮"
+    },
+    {
+      "tiangan": "己",
+      "palace": 2,
+      "palace_name": "坤二宮"
+    },
+    {
+      "tiangan": "戊",
+      "palace": 3,
+      "palace_name": "震三宮"
+    },
+    {
+      "tiangan": "庚",
+      "palace": 8,
+      "palace_name": "艮八宮"
+    }
+  ],
+  "wubuyushi": [
+    {
+      "day_gan": "甲",
+      "hour_gan": "庚"
+    },
+    {
+      "day_gan": "乙",
+      "hour_gan": "辛"
+    },
+    {
+      "day_gan": "丙",
+      "hour_gan": "壬"
+    },
+    {
+      "day_gan": "丁",
+      "hour_gan": "癸"
+    },
+    {
+      "day_gan": "戊",
+      "hour_gan": "甲"
+    },
+    {
+      "day_gan": "己",
+      "hour_gan": "乙"
+    },
+    {
+      "day_gan": "庚",
+      "hour_gan": "丙"
+    },
+    {
+      "day_gan": "辛",
+      "hour_gan": "丁"
+    },
+    {
+      "day_gan": "壬",
+      "hour_gan": "戊"
+    },
+    {
+      "day_gan": "癸",
+      "hour_gan": "己"
+    }
+  ],
+  "menpo": [
+    {
+      "men": "休門",
+      "palace": 9,
+      "palace_name": "離九宮",
+      "men_wuxing": "水",
+      "palace_wuxing": "火"
+    },
+    {
+      "men": "開門",
+      "palace": 3,
+      "palace_name": "震三宮",
+      "men_wuxing": "金",
+      "palace_wuxing": "木"
+    },
+    {
+      "men": "開門",
+      "palace": 4,
+      "palace_name": "巽四宮",
+      "men_wuxing": "金",
+      "palace_wuxing": "木"
+    },
+    {
+      "men": "驚門",
+      "palace": 3,
+      "palace_name": "震三宮",
+      "men_wuxing": "金",
+      "palace_wuxing": "木"
+    },
+    {
+      "men": "驚門",
+      "palace": 4,
+      "palace_name": "巽四宮",
+      "men_wuxing": "金",
+      "palace_wuxing": "木"
+    },
+    {
+      "men": "生門",
+      "palace": 1,
+      "palace_name": "坎一宮",
+      "men_wuxing": "土",
+      "palace_wuxing": "水"
+    },
+    {
+      "men": "死門",
+      "palace": 1,
+      "palace_name": "坎一宮",
+      "men_wuxing": "土",
+      "palace_wuxing": "水"
+    },
+    {
+      "men": "傷門",
+      "palace": 2,
+      "palace_name": "坤二宮",
+      "men_wuxing": "木",
+      "palace_wuxing": "土"
+    },
+    {
+      "men": "傷門",
+      "palace": 8,
+      "palace_name": "艮八宮",
+      "men_wuxing": "木",
+      "palace_wuxing": "土"
+    },
+    {
+      "men": "杜門",
+      "palace": 2,
+      "palace_name": "坤二宮",
+      "men_wuxing": "木",
+      "palace_wuxing": "土"
+    },
+    {
+      "men": "杜門",
+      "palace": 8,
+      "palace_name": "艮八宮",
+      "men_wuxing": "木",
+      "palace_wuxing": "土"
+    },
+    {
+      "men": "景門",
+      "palace": 6,
+      "palace_name": "乾六宮",
+      "men_wuxing": "火",
+      "palace_wuxing": "金"
+    },
+    {
+      "men": "景門",
+      "palace": 7,
+      "palace_name": "兌七宮",
+      "men_wuxing": "火",
+      "palace_wuxing": "金"
+    }
+  ],
+  "bamen_wuxing": {
+    "休門": "水",
+    "生門": "土",
+    "傷門": "木",
+    "杜門": "木",
+    "景門": "火",
+    "死門": "土",
+    "驚門": "金",
+    "開門": "金"
+  },
+  "new_gaps": [
+    {
+      "id": "G86",
+      "priority": "中",
+      "name": "官司用神中的天乙確定方法",
+      "current": "值符落宮地盤天干=天乙，但需確認是否天乙太乙（八神）還是值符落宮地盤天干本身",
+      "expected": "師傅明確：值符落宮原地盤天干就是天乙太乙"
+    },
+    {
+      "id": "G87",
+      "priority": "中",
+      "name": "門迫對官司判斷的具體影響",
+      "current": "開門（法院）門迫會怎樣？驚門（律師）門迫會怎樣？",
+      "expected": "需建立門迫×用神的交叉影響規則"
+    },
+    {
+      "id": "G88",
+      "priority": "低",
+      "name": "五不遇時的時辰天干推算",
+      "current": "需要從日干推算各時辰的天干（與EP16天輔吉時的甲X時類似）",
+      "expected": "需實現日上起時法則"
+    },
+    {
+      "id": "G89",
+      "priority": "低",
+      "name": "六儀擊刑的嚴重程度排序",
+      "current": "6個六儀擊刑是否同等嚴重？有沒有分級？",
+      "expected": "需等待師傅後續講解或案例分析"
+    },
+    {
+      "id": "G90",
+      "priority": "低",
+      "name": "飛干格/伏干格在官司場景的特殊含義",
+      "current": "一般含義已知，但官司中飛干=原告遭遇不測？伏干=原告失去自由？",
+      "expected": "需確認格局含義的場景化解讀"
+    }
+  ]
+}
