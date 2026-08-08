@@ -2,7 +2,7 @@
 """
 奇門遁甲量化系統 V2 (Qi Men Dun Jia Quantification System V2)
 =================================================================
-基於天心堂坤正師傅 EP01-EP22 全部教學內容的完整量化引擎
+基於天心堂坤正師傅 EP01-EP24 全部教學內容的完整量化引擎
 
 V2 新增（相較 V1/engine.py）：
   1. 完整格局偵測庫（吉格16 + 凶格14）
@@ -547,24 +547,24 @@ def find_palace_of(tg_map, rp, sp, tp, target):
     target: 天干('庚') / 門('開門') / 神('白虎') / 星('天芮')
     返回 (宮位, layer) 或 (None, None)
     """
-    # 天盤干
+    # 天盤干（支援 '乙/庚' 合併格式）
     for p, tg in tg_map.items():
-        if tg == target: return p, '天干'
+        if target in tg.split('/'): return p, '天干'
     # 人盤門
     for p, gate in rp.items():
         if gate == target: return p, '門'
     # 神盤
     for p, god in sp.items():
         if god == target: return p, '神'
-    # 天盤星
+    # 天盤星（支援 '天芮/天禽' 合併格式）
     for p, star in tp.items():
-        if star == target: return p, '星'
+        if target in star.split('/'): return p, '星'
     return None, None
 
 def find_tiangan_palace(tg_map, tg):
-    """查找天干所在宮位"""
+    """查找天干所在宮位（支援 '乙/庚' 合併格式）"""
     for p, t in tg_map.items():
-        if t == tg: return p
+        if tg in t.split('/'): return p
     return None
 
 def find_dipan_palace(dp, tg):
@@ -684,7 +684,7 @@ def get_tianyi_palace(tp, tg_map, dp, zhifu):
     """天乙太乙所在宮位 = 值符落宮的地盤天干"""
     zhifu_palace = None
     for p, star in tp.items():
-        if star == zhifu: zhifu_palace = p; break
+        if zhifu in star.split('/'): zhifu_palace = p; break
     if zhifu_palace is None: return None
     # 天乙 = 值符落宮的地盤天干
     tianyi_gan = dp.get(zhifu_palace, '')
@@ -776,7 +776,7 @@ def predict_criminal(r):
     xin_companions = []
     if rp.get(xin_palace): xin_companions.append(rp[xin_palace])
     if sp.get(xin_palace): xin_companions.append(sp[xin_palace])
-    if '傷門' in xin_companions or '白虎' in xin_companions or '庚' in [tg_map.get(xin_palace)]:
+    if '傷門' in xin_companions or '白虎' in xin_companions or '庚' in tg_map.get(xin_palace, '').split('/'):
         results['analysis'].append('階段: 警方拘捕階段（辛臨傷門/白虎/庚）')
     if '杜門' in xin_companions:
         results['analysis'].append('階段: 檢控階段（辛臨杜門）')
@@ -800,10 +800,10 @@ def predict_criminal(r):
             max_severity = max(max_severity, 2)
 
     # R04: 庚+辛同宮
-    if tg_map.get(xin_palace) == '辛' and dp.get(xin_palace) == '庚':
+    if tg_map.get(xin_palace, '').split('/')[0] == '辛' and dp.get(xin_palace) == '庚':
         results['verdicts'].append({'rule':'R04','detail':'庚+辛同宮','result':'定罪(重判)','severity':2})
         max_severity = max(max_severity, 2)
-    if tg_map.get(xin_palace) == '庚' and dp.get(xin_palace) == '辛':
+    if tg_map.get(xin_palace, '').split('/')[0] == '庚' and dp.get(xin_palace) == '辛':
         results['verdicts'].append({'rule':'R04','detail':'庚+辛同宮(反)','result':'定罪(重判)','severity':2})
         max_severity = max(max_severity, 2)
 
@@ -863,7 +863,7 @@ def predict_health(r, patient_tg=None, is_elderly=False):
 
     # 天芮宮信息
     tr_wx = PALACE_WUXING[tianrui_pal]
-    tr_tg = tp.get(tianrui_pal, ''.split('/')[0])
+    tr_tg = tg_map.get(tianrui_pal, '').split('/')[0]
     tr_dg = dp.get(tianrui_pal, '')
     tr_gate = rp.get(tianrui_pal, '')
     tr_spirit = sp.get(tianrui_pal, '')
