@@ -2,7 +2,7 @@
 """
 奇門遁甲量化系統 V2 (Qi Men Dun Jia Quantification System V2)
 =================================================================
-基於天心堂坤正師傅 EP01-EP19 全部教學內容的完整量化引擎
+基於天心堂坤正師傅 EP01-EP22 全部教學內容的完整量化引擎
 
 V2 新增（相較 V1/engine.py）：
   1. 完整格局偵測庫（吉格16 + 凶格14）
@@ -31,7 +31,7 @@ from datetime import datetime
 """
 奇門遁甲量化系統 V2 — Part 1: 基礎數據 + 四盤飛布 + 十二長生 + 入墓
 =====================================================================
-基於天心堂坤正師傅 EP01-EP19 全部教學內容
+基於天心堂坤正師傅 EP01-EP22 全部教學內容
 """
 
 TIANGAN = list('甲乙丙丁戊己庚辛壬癸')
@@ -69,6 +69,33 @@ DZ_CHONG = {'子':'午','午':'子','丑':'未','未':'丑','寅':'申','申':'�
 DZ2GONG = {'子':1,'丑':8,'寅':8,'卯':3,'辰':4,'巳':4,'午':9,'未':2,'申':2,'酉':7,'戌':6,'亥':6}
 LUOSHU = [[4,9,2],[3,5,7],[8,1,6]]
 XUNSHOU_STAR = {'甲子':'天蓬','甲戌':'天芮','甲申':'天沖','甲午':'天輔','甲辰':'天心','甲寅':'天禽'}
+
+# EP22: 宮位→原始天星映射（用於動態確定值符）
+JIUXING_HOME = {1:'天蓬', 2:'天芮', 3:'天沖', 4:'天輔', 5:'天禽', 6:'天心', 7:'天柱', 8:'天任', 9:'天英'}
+
+# EP22: 反向查找 星名→本宮
+JIUXING_HOME_R = {v: k for k, v in JIUXING_HOME.items()}
+
+# EP22: 後天八卦順時針8宮序（用於九星/八神旋轉）
+BAGUA_CW_8 = [1, 8, 3, 4, 9, 2, 7, 6]
+BAGUA_CCW_8 = [6, 7, 2, 9, 4, 3, 8, 1]  # 陰遁逆行
+
+# EP22: 洛書9宮飛布序（含中5，用於時宮計算）
+LUOSHU_9_YANG = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+LUOSHU_9_YIN  = [9, 8, 7, 6, 5, 4, 3, 2, 1]
+
+# EP22: 洛書8宮序（不含中5，用於人盤）
+LUOSHU_8_YANG = [1, 2, 3, 4, 6, 7, 8, 9]
+LUOSHU_8_YIN  = [9, 8, 7, 6, 4, 3, 2, 1]
+
+# EP22: 驛馬口訣
+YIMA_MAP = {
+    '申':'寅', '子':'寅', '辰':'寅',
+    '寅':'申', '午':'申', '戌':'申',
+    '巳':'亥', '酉':'亥', '丑':'亥',
+    '亥':'巳', '卯':'巳', '未':'巳',
+}
+
 STAR_DOOR = {'天蓬':'休門','天芮':'死門','天沖':'傷門','天輔':'杜門','天禽':'死門','天心':'開門','天柱':'驚門','天任':'生門','天英':'景門'}
 SIGAN_ROLES = {'年干':['父母','長輩','最高領導'],'月干':['兄弟姊妹','同事','平輩'],'日干':['求測人','自己'],'時干':['子女','下級','求測的事']}
 
@@ -107,28 +134,92 @@ def make_dipan(ju,yang):
     o=list(range(1,10)) if yang else list(range(9,0,-1)); s=o.index(ju); dp={}
     for i,st in enumerate(LIUYI_SANQI): dp[o[(s+i)%9]]=st
     return dp
-def make_tianpan(dp,stg,xs,yang):
-    zf=XUNSHOU_STAR[xs]; zfh=JIUXING.index(zf)+1; dy=XUNSHOU_DUNYI[xs]; dyh=next((p for p,s in dp.items() if s==dy),1)
-    tg=next((p for p,s in dp.items() if s==stg),zfh)
-    o=list(range(1,10)) if yang else list(range(9,0,-1)); off=(o.index(tg)-o.index(zfh))%9
-    stars={}; sm={}
-    for i,star in enumerate(JIUXING): stars[o[(o.index(i+1)+off)%9]]=star
+def make_tianpan(dp, stg, zhifu, yang):
+    """EP22: 排布天盤九星 + 天盤干
+    dp: 地盤 {宮位: 天干}
+    stg: 時干
+    zhifu: 值符星名（已由qiju_v2從旬首六儀地盤宮位確定）
+    yang: 陽遁/陰遁
+    九星旋轉使用後天八卦順時針8宮序 [1,8,3,4,9,2,7,6]
+    天禽(中5)跟隨天芮(寄宮坤2)
+    """
+    cw = BAGUA_CW_8 if yang else BAGUA_CCW_8
+    zfh = JIUXING_HOME_R[zhifu]  # 值符本宮
+    # 時干在地盤的宮位
+    tg_palace = next((p for p, s in dp.items() if s == stg), zfh)
+    if tg_palace == 5: tg_palace = 2
+    # 後天八卦順時針序中的位移
+    zfh_idx = cw.index(zfh) if zfh in cw else 0
+    tg_idx = cw.index(tg_palace) if tg_palace in cw else 0
+    off = (tg_idx - zfh_idx) % 8
+    stars = {}
+    for star in JIUXING:
+        if star == '天禽': continue
+        home = JIUXING_HOME_R[star]
+        if home == 5: home = 2
+        h_idx = cw.index(home) if home in cw else 0
+        new_palace = cw[(h_idx + off) % 8]
+        stars[new_palace] = star
+    # 天禽跟隨天芮
+    for p, s in stars.items():
+        if s == '天芮':
+            stars[p] = '天芮/天禽'
+            break
+    # 天盤干
+    sm = {}
+    center_stem = None
     for stem in LIUYI_SANQI:
-        sp=next((p for p,s in dp.items() if s==stem),None)
+        sp = next((p for p, s in dp.items() if s == stem), None)
         if sp is None: continue
-        sm[o[(o.index(sp)+off)%9]]=stem
-    return stars,sm,zf
-def make_renpan(sdz,xs,yang):
-    zs=STAR_DOOR[XUNSHOU_STAR[xs]]; zsh=BAMEN_HOME[BAMEN_ORDER.index(zs)]; tg=DZ2GONG[sdz]
-    fly=[1,2,3,4,6,7,8,9] if yang else [9,8,7,6,4,3,2,1]
-    off=(fly.index(tg)-fly.index(zsh))%8; doors={}
-    for i,d in enumerate(BAMEN_ORDER): doors[fly[(i+off)%8]]=d
-    return doors,zs
-def make_shenpan(tp,zf,yang):
-    zfp=next((p for p,s in tp.items() if s==zf),1)
-    fly=[1,2,3,4,6,7,8,9] if yang else [9,8,7,6,4,3,2,1]
-    st=fly.index(zfp) if zfp in fly else 0; gods={}
-    for i,g in enumerate(BASHEN_ORDER): gods[fly[(st+i)%8]]=g
+        if sp == 5: center_stem = stem; continue
+        if sp not in cw: continue
+        h_idx = cw.index(sp)
+        new_palace = cw[(h_idx + off) % 8]
+        sm[new_palace] = stem
+    # 中5的天干跟隨寄宮(坤2)的天干
+    if center_stem is not None:
+        home2_idx = cw.index(2)
+        jg_palace = cw[(home2_idx + off) % 8]
+        if jg_palace in sm:
+            sm[jg_palace] = sm[jg_palace] + '/' + center_stem
+    return stars, sm
+def make_renpan(dp, sgz, xs_idx, zhishi, yang):
+    """EP22: 排布人盤八門
+    dp: 地盤, sgz: 時干支, xs_idx: 旬首index
+    zhishi: 值使門名, yang: 陽遁/陰遁
+    時宮: 從旬首六儀地盤宮位按步數飛布(含中5)
+    八門: 洛書8宮序 + 反向排列
+    """
+    zsh = BAMEN_HOME[BAMEN_ORDER.index(zhishi)]
+    xs_name = LIUJIAZI[xs_idx]
+    dy = XUNSHOU_DUNYI[xs_name]
+    start_palace = next((p for p, s in dp.items() if s == dy), 1)
+    sgz_idx = LIUJIAZI.index(sgz)
+    steps = sgz_idx - xs_idx
+    fly9 = LUOSHU_9_YANG if yang else LUOSHU_9_YIN
+    start_idx = fly9.index(start_palace) if start_palace in fly9 else 0
+    time_palace = fly9[(start_idx + steps) % 9]
+    if time_palace == 5: time_palace = 2
+    # 八門反向排列
+    fly8 = LUOSHU_8_YANG if yang else LUOSHU_8_YIN
+    tp_idx = fly8.index(time_palace) if time_palace in fly8 else 0
+    zhishi_bidx = BAMEN_ORDER.index(zhishi)
+    const = (tp_idx + zhishi_bidx) % 8
+    doors = {}
+    for i, d in enumerate(BAMEN_ORDER):
+        palace_idx = (const - i) % 8
+        doors[fly8[palace_idx]] = d
+    return doors, zhishi, time_palace
+def make_shenpan(zhifu_palace, yang):
+    """EP22: 排布八神
+    zhifu_palace: 值符落宮, yang: 陽遁/陰遁
+    八神小值符跟隨大值符，其餘按後天八卦順/逆時針排布
+    """
+    cw = BAGUA_CW_8 if yang else BAGUA_CCW_8
+    st = cw.index(zhifu_palace) if zhifu_palace in cw else 0
+    gods = {}
+    for i, g in enumerate(BASHEN_ORDER):
+        gods[cw[(st + i) % 8]] = g
     return gods
 
 # === 十二長生（EP14/EP15）===
@@ -327,7 +418,7 @@ def check_fugan(t_gan, d_gan, day_gan):
 
 def detect_fuyin(dp, tp, rp):
     """伏吟局：天盤干與地盤干完全相同 → (bool, reason)"""
-    count = sum(1 for p in range(1,10) if tp.get(p) == dp.get(p))
+    count = sum(1 for p in range(1,10) if tp.get(p,''.split('/')[0]).split('/')[0] == dp.get(p))
     if count >= 8:
         return True, f'伏吟局（{count}/9宮天干地干相同）→利主不利客、慢、不動'
     return False, ''
@@ -335,7 +426,7 @@ def detect_fuyin(dp, tp, rp):
 def detect_fanyin(dp, tp):
     """反吟局：天盤干與地盤干完全相反（對宮互換）→ (bool, reason)"""
     chong_pairs = [(1,9),(2,8),(3,7),(4,6)]
-    count = sum(1 for a,b in chong_pairs if tp.get(a)==dp.get(b) and tp.get(b)==dp.get(a))
+    count = sum(1 for a,b in chong_pairs if tp.get(a,''.split('/')[0]).split('/')[0]==dp.get(b) and tp.get(b,''.split('/')[0]).split('/')[0]==dp.get(a))
     if count >= 3:
         return True, f'反吟局（{count}/4對宮互換）→反覆不定、逢衝必動'
     return False, ''
@@ -772,7 +863,7 @@ def predict_health(r, patient_tg=None, is_elderly=False):
 
     # 天芮宮信息
     tr_wx = PALACE_WUXING[tianrui_pal]
-    tr_tg = tp.get(tianrui_pal, '')
+    tr_tg = tp.get(tianrui_pal, ''.split('/')[0])
     tr_dg = dp.get(tianrui_pal, '')
     tr_gate = rp.get(tianrui_pal, '')
     tr_spirit = sp.get(tianrui_pal, '')
@@ -941,17 +1032,41 @@ def qiju_v2(dt, scene=None):
     xs, xs_idx = find_xunshou(s_idx)
     ju, yuan, yang, jname = ju_number(dt)
 
-    # 四盤
+    # EP22: 地盤
     dp = make_dipan(ju, yang)
-    tp, tg_map, zhifu = make_tianpan(dp, stg, xs, yang)
-    rp, zhishi = make_renpan(sdz, xs, yang)
-    sp = make_shenpan(tp, zhifu, yang)
+
+    # EP22: 確定值符 — 旬首六儀在地盤的宮位 → 該宮原始天星
+    dy = XUNSHOU_DUNYI[xs]
+    dyh = next((p for p, s in dp.items() if s == dy), 1)
+    if dyh == 5: dyh = 2  # 中5寄坤2
+    zhifu = JIUXING_HOME[dyh]
+
+    # EP22: 確定值使門
+    zhishi = STAR_DOOR[zhifu]
+
+    # EP22: 天盤
+    tp, tg_map = make_tianpan(dp, stg, zhifu, yang)
+
+    # EP22: 人盤
+    rp, zhishi, time_palace = make_renpan(dp, sgz, xs_idx, zhishi, yang)
+
+    # EP22: 神盤
+    zhifu_palace = None
+    for p, s in tp.items():
+        if zhifu in s: zhifu_palace = p; break
+    if zhifu_palace is None: zhifu_palace = 1
+    sp = make_shenpan(zhifu_palace, yang)
+
+    # EP22: 空亡 + 驛馬
+    kong_dz, _ = get_xunkong(sgz)
+    kong_palaces = [DZ2GONG[dz] for dz in kong_dz if dz in DZ2GONG]
+    ym_dz, ym_palace = calc_yima(sdz)
 
     # V2 評分
     scores = {}; details = {}
     for p in range(1, 10):
-        star = tp.get(p, ''); gate = rp.get(p, ''); spirit = sp.get(p, '')
-        t_g = tg_map.get(p, stg); d_g = dp.get(p, '')
+        star = tp.get(p, ''.split('/')[0]).split('/')[0]; gate = rp.get(p, ''); spirit = sp.get(p, '')
+        t_g = tg_map.get(p, stg).split('/')[0]; d_g = dp.get(p, '')
         sc, det = palace_score_v2(p, star, gate, spirit, t_g, d_g, p, dgz[0], zhishi)
         scores[p] = sc; details[p] = det
 
@@ -975,6 +1090,8 @@ def qiju_v2(dt, scene=None):
         fanyin={'active': fyn_ok, 'reason': fyn_reason},
         wubuyushi={'active': wby_ok, 'reason': wby_reason},
         tianfu_jishi={'active': tf_ok, 'reason': tf_reason},
+        kongwang={'dz': kong_dz, 'palaces': kong_palaces},
+        yima={'dz': ym_dz, 'palace': ym_palace},
     )
 
     # 場景預測
@@ -1029,6 +1146,15 @@ def print_chart_v2(r, title=''):
         print(f'  ⚠️ {" | ".join(extras)}')
 
 
+
+    # EP22: 空亡 + 驛馬
+    kw = r.get('kongwang', {})
+    ym = r.get('yima', {})
+    if kw.get('dz'):
+        kw_gong = ', '.join(f'{GONG_BAGUA.get(p,p)}{p}' for p in kw['palaces'])
+        print(f'  空亡: {"、".join(kw["dz"])} ({kw_gong})')
+    if ym.get('dz'):
+        print(f'  驛馬: {ym["dz"]} ({GONG_BAGUA.get(ym["palace"],"")}{ym["palace"]}宮)')
     # 九宮格
     for ri, row in enumerate(LUOSHU):
         if ri == 1: print('  ' + '─' * 58)
@@ -1036,7 +1162,7 @@ def print_chart_v2(r, title=''):
             cells = []
             for p in row:
                 bg = GONG_BAGUA[p]
-                star = r['tp'].get(p,'-'); tg = r['tg'].get(p,'-')
+                star = r['tp'].get(p,'-').split('/')[0]; tg = r['tg'].get(p,'-')
                 gate = r['rp'].get(p,'-'); spirit = r['sp'].get(p,'-')
                 dg = r['dp'].get(p,'-'); sc = r['scores'][p]
                 dets = r['details'][p]
@@ -1165,6 +1291,15 @@ def print_guxu(gx):
     print(f'    孤位: {gx["gu_dz"]} ({gx["gu_fangwei"]})')
     print(f'    虛位: {gx["xu_dz"]} ({gx["xu_fangwei"]})')
     print(f'    運用: {gx["advice"]}')
+
+# === EP22: 驛馬計算 ===
+def calc_yima(sdz):
+    """EP22: 根據時支計算驛馬位
+    口訣：申子辰在寅，寅午戌在申，巳酉丑在亥，亥卯未在巳
+    """
+    ym_dz = YIMA_MAP.get(sdz, '')
+    ym_palace = DZ2GONG.get(ym_dz, 0)
+    return ym_dz, ym_palace
 
 # === C. 考試預測函數（EP19）===
 def predict_exam(r, is_self=True):
@@ -1454,9 +1589,9 @@ def bamen_cuiyun(r):
         bonuses = []
         penalties = []
         
-        t_gan = tg_map.get(palace, '')
+        t_gan = tg_map.get(palace, '').split('/')[0].split('/')[0]
         d_gan = dp.get(palace, '')
-        star = tp.get(palace, '')
+        star = tp.get(palace, '').split('/')[0]
         spirit = sp.get(palace, '')
         
         # 三奇（天盤或地盤）
