@@ -1,0 +1,49 @@
+{
+  "episode": 20,
+  "title": "孤虛法 + 每周最佳時間方位",
+  "guxu_rules": {
+    "gu_definition": "空亡位",
+    "xu_definition": "空亡位對衝方位",
+    "applicable": "單一對手",
+    "not_applicable": [
+      "多對手(用八門催運法)",
+      "無對手(用每日最佳時間方位)"
+    ],
+    "yang_dizhi": [
+      "子",
+      "寅",
+      "辰",
+      "午",
+      "申",
+      "戌"
+    ],
+    "yin_dizhi": [
+      "丑",
+      "卯",
+      "巳",
+      "未",
+      "酉",
+      "亥"
+    ],
+    "rule_yang": "時支陽→選陽性空亡地支為孤位",
+    "rule_yin": "時支陰→選陰性空亡地支為孤位",
+    "usage": "背對孤位、面向虛位而坐"
+  },
+  "example": {
+    "time": "辛丑年己亥月戊子日癸亥時",
+    "xunkong": [
+      "子",
+      "丑"
+    ],
+    "shizhi": "亥",
+    "shizhi_yin": true,
+    "gu": "丑",
+    "xu": "未"
+  },
+  "engine_functions": [
+    "calc_guxu",
+    "get_xunkong",
+    "best_time_direction",
+    "weekly_forecast"
+  ]
+}

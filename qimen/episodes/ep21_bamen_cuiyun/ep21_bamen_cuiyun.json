@@ -1,0 +1,52 @@
+{
+  "episode": 21,
+  "title": "八門催運法 + 兩周預測",
+  "bamen_cuiyun": {
+    "applicable": "多於一個對手的博弈",
+    "not_applicable": [
+      "單一對手(用孤虛法)",
+      "無對手(用每日最佳時間方位)"
+    ],
+    "core_gates": [
+      "開門",
+      "休門",
+      "生門"
+    ],
+    "scoring_criteria": {
+      "sanqi": [
+        "乙",
+        "丙",
+        "丁"
+      ],
+      "jixing": [
+        "天心",
+        "天任",
+        "天輔"
+      ],
+      "jishen": [
+        "值符",
+        "太陰",
+        "六合",
+        "九地",
+        "九天"
+      ],
+      "xiongshen": [
+        "騰蛇",
+        "玄武",
+        "白虎"
+      ],
+      "jige": "加分",
+      "xiongge": "扣分",
+      "menpo": "扣分"
+    },
+    "score_range": "0-100"
+  },
+  "guxu_clarification": {
+    "single_opponent_only": true,
+    "example_failure": "麻將/牌局有多個對手，無法安排所有對手在虛位"
+  },
+  "engine_functions": [
+    "bamen_cuiyun",
+    "print_bamen_cuiyun"
+  ]
+}
