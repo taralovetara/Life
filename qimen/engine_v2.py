@@ -1379,3 +1379,189 @@ def print_weekly_forecast(wf):
     if wf['worst_days']:
         print('  worst_days: ' + ' '.join(wf['worst_days']))
     print('=' * 60)
+
+
+# ================================================================
+# Part 6: 八門催運法（EP21）
+# ================================================================
+
+# 八門催運法適用條件
+BAMEN_CUIYUN_RULES = {
+    'name': '八門催運法（EP21）',
+    'applicable': '多於一個對手的博弈（麻將、牌局、投標、鬥地主等）',
+    'not_applicable': '單一對手（用孤虛法）或無對手（用每日最佳時間方位）',
+    'core': '以開門、休門、生門三吉門落宮為基礎，選最佳宮位方位',
+}
+
+# 吉凶分類（EP21 明確列出的分類）
+SANQI = set(['乙', '丙', '丁'])  # 三奇
+JIXING = set(['天心', '天任', '天輔'])  # 吉星
+JISHEN = set(['值符', '太陰', '六合', '九地', '九天'])  # 吉神
+XIONGSHEN = set(['騰蛇', '玄武', '白虎'])  # 凶神
+SAN_JIMEN = set(['開門', '休門', '生門'])  # 三吉門
+
+# 吉格名稱列表（用於八門催運法評分）
+JI_GE_NAMES = set([g[0] for g in JI_GE])
+XIONG_GE_NAMES = set([g[0] for g in XIONG_GE])
+
+
+def bamen_cuiyun(r):
+    """八門催運法（EP21）
+    
+    適用於多對手博弈場景。找出三吉門（開門、休門、生門）落宮，
+    綜合評估宮位內用神吉凶，選出最佳方位。
+    
+    評分標準（EP21 師傅明確提及）：
+      + 三奇（乙丙丁）在天盤或地盤
+      + 吉星（天心、天任、天輔）
+      + 吉神（值符、太陰、六合、九地、九天）
+      + 吉格（青龍返首、飛鳥跌穴、玉女守門等）
+      - 凶格（庚+丙大凶格等）
+      - 門迫
+      - 凶神（騰蛇、玄武、白虎）
+    
+    返回 dict:
+      gates: 三吉門各自宮位評估
+      best: 最佳宮位及方位
+      advice: 建議
+    """
+    rp = r['rp']
+    tp = r['tp']
+    tg_map = r['tg']
+    sp = r['sp']
+    dp = r['dp']
+    day_gan = r['dgz'][0]
+    zhishi = r['zhishi']
+    
+    results = {'gates': [], 'best': None, 'advice': ''}
+    
+    for men in ['開門', '休門', '生門']:
+        # 找門所在宮位
+        palace = None
+        for p, m in rp.items():
+            if m == men:
+                palace = p
+                break
+        if palace is None:
+            results['gates'].append({
+                'men': men, 'palace': None, 'score': 0,
+                'detail': '盤中無此門', 'fangwei': '?',
+            })
+            continue
+        
+        # 評分
+        score = 50  # 基礎分
+        bonuses = []
+        penalties = []
+        
+        t_gan = tg_map.get(palace, '')
+        d_gan = dp.get(palace, '')
+        star = tp.get(palace, '')
+        spirit = sp.get(palace, '')
+        
+        # 三奇（天盤或地盤）
+        sanqi_found = []
+        if t_gan in SANQI: sanqi_found.append(f'天盤{t_gan}')
+        if d_gan in SANQI: sanqi_found.append(f'地盤{d_gan}')
+        if sanqi_found:
+            bonus = len(sanqi_found) * 10
+            score += bonus
+            bonuses.append(f'三奇({"、".join(sanqi_found)})+{bonus}')
+        
+        # 吉星
+        if star in JIXING:
+            score += 10
+            bonuses.append(f'吉星({star})+10')
+        elif star in ['天禽']:
+            score += 5
+            bonuses.append(f'中平星({star})+5')
+        elif star in ['天芮', '天蓬', '天柱']:
+            score -= 10
+            penalties.append(f'凶星({star})-10')
+        
+        # 吉神
+        if spirit in JISHEN:
+            score += 10
+            bonuses.append(f'吉神({spirit})+10')
+        elif spirit in XIONGSHEN:
+            score -= 15
+            penalties.append(f'凶神({spirit})-15')
+        
+        # 門迫
+        ok, reason, _ = check_menpo(men, palace)
+        if ok:
+            score -= 20
+            penalties.append(f'門迫-20')
+        # 得地
+        ok, _ = check_dedi(men, palace)
+        if ok:
+            score += 5
+            bonuses.append(f'得地+5')
+        
+        # 格局偵測
+        gejus = detect_all_geju(t_gan, d_gan, men, spirit, palace, day_gan, zhishi)
+        for gtype, gname, gsc in gejus:
+            if gtype == '吉':
+                score += int(gsc * 5)  # 放大格局影響
+                bonuses.append(f'{gname}+{int(gsc*5)}')
+            else:
+                score += int(gsc * 5)
+                penalties.append(f'{gname}{int(gsc*5)}')
+        
+        # 六儀擊刑 and 入墓已包含在 detect_all_geju 中，不重複扣分
+        
+        score = max(0, min(100, score))  # 限制0-100
+        
+        results['gates'].append({
+            'men': men,
+            'palace': palace,
+            'fangwei': GONG_BAGUA[palace],
+            'score': score,
+            'star': star,
+            'spirit': spirit,
+            't_gan': t_gan,
+            'd_gan': d_gan,
+            'bonuses': bonuses,
+            'penalties': penalties,
+            'detail': f'{men}落{GONG_BAGUA[palace]}{palace}宮',
+        })
+    
+    # 選最佳
+    valid = [g for g in results['gates'] if g['palace'] is not None]
+    if valid:
+        best = max(valid, key=lambda g: g['score'])
+        results['best'] = best
+        if best['score'] >= 80:
+            results['advice'] = f'坐{best["fangwei"]}方（{best["detail"]}，{best["score"]}分），大殺四方'
+        elif best['score'] >= 60:
+            results['advice'] = f'坐{best["fangwei"]}方（{best["detail"]}，{best["score"]}分），有優勢'
+        else:
+            results['advice'] = f'最佳僅{best["fangwei"]}方{best["score"]}分，建議擇日再戰或減低投入'
+    else:
+        results['advice'] = '三吉門均不在盤中，無法使用八門催運法'
+    
+    return results
+
+
+def print_bamen_cuiyun(bc):
+    """格式化輸出八門催運法結果"""
+    print('')
+    print('=' * 60)
+    print('  八門催運法（EP21）- 多對手博弈')
+    print('=' * 60)
+    for g in bc['gates']:
+        if g['palace'] is None:
+            print('  ' + g['men'] + ': ' + g['detail'])
+            continue
+        print('  ' + g['detail'] + ' [' + str(g['score']) + '分]')
+        print('    星: ' + g['star'] + ' | 神: ' + g['spirit'] + ' | 天干: ' + g['t_gan'] + '+' + g['d_gan'])
+        if g['bonuses']:
+            print('    加分: ' + ', '.join(g['bonuses']))
+        if g['penalties']:
+            print('    扣分: ' + ', '.join(g['penalties']))
+    print('')
+    if bc['best']:
+        print('  >>> ' + bc['advice'])
+    else:
+        print('  >>> ' + bc['advice'])
+    print('=' * 60)
