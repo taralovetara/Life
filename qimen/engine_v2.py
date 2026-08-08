@@ -28,13 +28,11 @@ V2 新增（相較 V1/engine.py）：
 ⚠️ 日干支公式已用 2000-01-01=戊午日 校準
 """
 from datetime import datetime
-#!/usr/bin/env python3
 """
 奇門遁甲量化系統 V2 — Part 1: 基礎數據 + 四盤飛布 + 十二長生 + 入墓
 =====================================================================
 基於天心堂坤正師傅 EP01-EP19 全部教學內容
 """
-from datetime import datetime
 
 TIANGAN = list('甲乙丙丁戊己庚辛壬癸')
 DIZHI   = list('子丑寅卯辰巳午未申酉戌亥')
@@ -196,7 +194,6 @@ def check_dedi(men,palace):
     return False,f'{men}({mw})落{GONG_BAGUA[palace]}{palace}({pw})→{r}'
 
 
-#!/usr/bin/env python3
 """
 奇門遁甲量化系統 V2 — Part 2: 完整格局偵測庫 + 六儀擊刑 + 門迫 + 五不遇時
 =====================================================================
@@ -442,7 +439,6 @@ def geju_score(results):
     return sum(r[2] for r in results)
 
 
-#!/usr/bin/env python3
 """
 奇門遁甲量化系統 V2 — Part 3: 用神體系 + 場景預測函數
 =====================================================================
@@ -577,13 +573,15 @@ SCENE_YONGSHEN = {
         'stages': ['拘捕(辛臨白虎/庚/傷門)', '檢控(辛臨杜門)', '審理(開門vs辛生剋)'],
     },
     'exam': {
-        'name': '考試（EP19）',
+        'name': '考試升學（EP19）',
         'yongshen': {
-            '值符': '學校/考官', '值使': '考生自己',
-            '丁': '試卷', '景門': '成績',
+            '日干': '考生自己(親自求測)', '時干': '考生(父母代測)',
+            '年干': '錄取學校', '天輔星': '繼續升學機會',
+            '景門': '試卷/試題',
         },
-        'positive': '值符宮生值使宮、丁宮+景門宮吉',
-        'negative': '值符宮剋值使宮、丁/景門入墓或門迫',
+        'method': '三步法: 景門vs考生 → 年干vs考生 → 天輔vs考生',
+        'positive': '三用神都生考生宮→大吉一定考上',
+        'negative': '三用神都剋考生宮→凶考不上',
     },
 }
 
@@ -858,7 +856,6 @@ def cross_validate_yongshen(yongshen_scores):
     return {'agreement': '分歧', 'direction': 'neutral', 'confidence': 'low'}
 
 
-#!/usr/bin/env python3
 """
 奇門遁甲量化系統 V2 — Part 4: 完整起局 + 增強評分 + 多場景輸出
 =====================================================================
@@ -988,8 +985,13 @@ def qiju_v2(dt, scene=None):
             result['prediction'] = predict_criminal(result)
         elif scene == 'health':
             result['prediction'] = predict_health(result)
+        elif scene == 'exam':
+            result['prediction'] = predict_exam(result)
         elif scene in SCENE_YONGSHEN:
             result['scene_info'] = SCENE_YONGSHEN[scene]
+
+    # 孤虛法
+    result['guxu'] = calc_guxu(sgz, result)
 
     return result
 
@@ -1049,7 +1051,7 @@ def print_chart_v2(r, title=''):
                         cells.append(f' {tags}')
                     else:
                         cells.append('')
-        print()
+            print('  ' + ' | '.join(c for c in cells if c or True))
 
     # 評分排名
     ranked = sorted(r['scores'].items(), key=lambda x: x[1], reverse=True)
@@ -1072,3 +1074,308 @@ def print_chart_v2(r, title=''):
         print(f'  {i+1:>2}. {bg}{p} ({r["tp"].get(p,"")}/{r["rp"].get(p,"")}/{r["sp"].get(p,"")}): {s:+.1f}{tags}  {ex_str}')
     print(sep)
 
+
+
+# ================================================================
+# Part 5: 孤虛法 + 考試預測 + 每周最佳時間方位
+# ================================================================
+
+# === A. 空亡計算 ===
+DZ_YANG = set(['子','寅','辰','午','申','戌'])  # 陽性地支
+DZ_YIN  = set(['丑','卯','巳','未','酉','亥'])  # 陰性地支
+DZ_FANGWEI = {
+    '子':'正北(坎1)','丑':'東北偏北(艮8)','寅':'東北偏東(艮8)',
+    '卯':'正東(震3)','辰':'東南偏東(巽4)','巳':'東南偏南(巽4)',
+    '午':'正南(離9)','未':'西南偏南(坤2)','申':'西南偏西(坤2)',
+    '酉':'正西(兌7)','戌':'西北偏西(乾6)','亥':'西北偏北(乾6)',
+}
+DZ_FANGWEI_SIMPLE = {
+    '子':'正北','丑':'東北','寅':'東北','卯':'正東',
+    '辰':'東南','巳':'東南','午':'正南','未':'西南',
+    '申':'西南','酉':'正西','戌':'西北','亥':'西北',
+}
+
+# 每旬空亡地支
+XUNKONG_MAP = {
+    '甲子': ['戌','亥'], '甲戌': ['申','酉'], '甲申': ['午','未'],
+    '甲午': ['辰','巳'], '甲辰': ['寅','卯'], '甲寅': ['子','丑'],
+}
+
+def get_xunkong(jz):
+    """根據干支取得空亡地支列表"""
+    # 找到該干支所在的旬
+    jz_idx = LIUJIAZI.index(jz) if jz in LIUJIAZI else 0
+    for xs_idx in reversed(XUNSHOU_IDX):
+        if jz_idx >= xs_idx:
+            xs_name = LIUJIAZI[xs_idx]
+            return XUNKONG_MAP.get(xs_name, []), xs_name
+    return [], '甲子'
+
+# === B. 孤虛法計算 ===
+def calc_guxu(sgz, r=None):
+    """孤虛法計算
+    sgz: 時干支 (如 '癸亥')
+    r: qiju_v2 完整盤局（可選）
+    
+    返回 dict:
+      xunkong: 空亡地支列表
+      xunshou: 旬首
+      shizhi_yang: 時支是否陽性
+      gu_dz: 孤位地支
+      xu_dz: 虛位地支
+      gu_fangwei: 孤位方位
+      xu_fangwei: 虛位方位
+      advice: 運用建議
+    """
+    kong_dz_list, xs_name = get_xunkong(sgz)
+    shi_zhi = sgz[1]
+    is_yang = shi_zhi in DZ_YANG
+    
+    # 根據時支陰陽選擇孤位
+    gu_dz = None
+    for dz in kong_dz_list:
+        if (dz in DZ_YANG) == is_yang:
+            gu_dz = dz
+            break
+    if gu_dz is None and kong_dz_list:
+        gu_dz = kong_dz_list[0]  # fallback
+    
+    # 虛位 = 孤位的對衝地支
+    xu_dz = DZ_CHONG.get(gu_dz, '') if gu_dz else ''
+    
+    return {
+        'xunkong': kong_dz_list,
+        'xunshou': xs_name,
+        'shizhi': shi_zhi,
+        'shizhi_yang': is_yang,
+        'gu_dz': gu_dz,
+        'xu_dz': xu_dz,
+        'gu_fangwei': DZ_FANGWEI.get(gu_dz, '') if gu_dz else '',
+        'xu_fangwei': DZ_FANGWEI.get(xu_dz, '') if xu_dz else '',
+        'gu_fangwei_simple': DZ_FANGWEI_SIMPLE.get(gu_dz, '') if gu_dz else '',
+        'xu_fangwei_simple': DZ_FANGWEI_SIMPLE.get(xu_dz, '') if xu_dz else '',
+        'advice': f'自己背對{gu_dz}({DZ_FANGWEI_SIMPLE.get(gu_dz,"?")})、面向{xu_dz}({DZ_FANGWEI_SIMPLE.get(xu_dz,"?")})而坐' if gu_dz else '無法計算',
+    }
+
+def print_guxu(gx):
+    """格式化輸出孤虛法結果"""
+    print(f'  孤虛法:')
+    print(f'    旬首: {gx["xunshou"]}  |  空亡: {"、".join(gx["xunkong"])}')
+    print(f'    時支: {gx["shizhi"]}({"陽" if gx["shizhi_yang"] else "陰"})')
+    print(f'    孤位: {gx["gu_dz"]} ({gx["gu_fangwei"]})')
+    print(f'    虛位: {gx["xu_dz"]} ({gx["xu_fangwei"]})')
+    print(f'    運用: {gx["advice"]}')
+
+# === C. 考試預測函數（EP19）===
+def predict_exam(r, is_self=True):
+    """考試升學預測
+    r = qiju_v2() 完整盤局
+    is_self: 是否親自求測（True=日干為考生, False=時干為考生）
+    
+    四用神: 考生(日干/時干) / 景門(試題) / 年干(學校) / 天輔星(升學)
+    """
+    dp, tp, tg_map, rp, sp = r['dp'], r['tp'], r['tg'], r['rp'], r['sp']
+    day_gan = r['dgz'][0]
+    hour_gan = r['stg']
+    
+    results = {'steps': [], 'verdict': '', 'confidence': ''}
+    
+    # 考生用神
+    candidate_tg = day_gan if is_self else hour_gan
+    candidate_label = '日干(自己)' if is_self else '時干(代測)'
+    candidate_pal = find_tiangan_palace(tg_map, candidate_tg)
+    
+    if candidate_pal is None:
+        results['verdict'] = f'無法找到考生用神({candidate_tg})'
+        return results
+    
+    results['steps'].append({
+        'step': 0, 'check': f'考生({candidate_label}={candidate_tg})',
+        'palace': f'{GONG_BAGUA[candidate_pal]}{candidate_pal}宮',
+    })
+    
+    sheng_count = 0
+    ke_count = 0
+    
+    # Step 1: 景門(試題) vs 考生
+    jingmen_pal = find_palace_of(tg_map, rp, sp, tp, '景門')[0]
+    if jingmen_pal:
+        rel, sc = palace_shengke(jingmen_pal, candidate_pal)
+        detail = f'景門宮{GONG_BAGUA[jingmen_pal]}→考生宮{GONG_BAGUA[candidate_pal]}: {rel}'
+        if sc > 0:
+            detail += ' → 考生答題好，成績不差'
+            sheng_count += 1
+        elif sc < 0:
+            detail += ' → 試題對考生不利'
+            ke_count += 1
+        else:
+            detail += ' → 成績一般'
+        results['steps'].append({'step': 1, 'check': '景門(試題) vs 考生', 'detail': detail, 'score': sc})
+    
+    # Step 2: 年干(學校) vs 考生
+    year_gan = _get_year_gan(r['dt'])
+    year_pal = find_tiangan_palace(tg_map, year_gan)
+    if year_pal:
+        rel, sc = palace_shengke(year_pal, candidate_pal)
+        detail = f'年干(學校)宮{GONG_BAGUA[year_pal]}→考生宮{GONG_BAGUA[candidate_pal]}: {rel}'
+        if sc > 0:
+            detail += ' → 學校會錄取考生'
+            sheng_count += 1
+        elif sc < 0:
+            detail += ' → 學校不會錄取'
+            ke_count += 1
+        else:
+            detail += ' → 錄取與否需看其他因素'
+        results['steps'].append({'step': 2, 'check': '年干(學校) vs 考生', 'detail': detail, 'score': sc})
+    
+    # Step 3: 天輔星(升學) vs 考生
+    tianfu_pal = find_palace_of(tg_map, rp, sp, tp, '天輔')[0]
+    if tianfu_pal:
+        rel, sc = palace_shengke(tianfu_pal, candidate_pal)
+        detail = f'天輔星宮{GONG_BAGUA[tianfu_pal]}→考生宮{GONG_BAGUA[candidate_pal]}: {rel}'
+        if sc > 0:
+            detail += ' → 有機會繼續升學'
+            sheng_count += 1
+        elif sc < 0:
+            detail += ' → 升學機會渺茫'
+            ke_count += 1
+        else:
+            detail += ' → 升學看運氣'
+        results['steps'].append({'step': 3, 'check': '天輔星(升學) vs 考生', 'detail': detail, 'score': sc})
+    
+    # 綜合判斷
+    total = sheng_count + ke_count
+    if total == 0:
+        results['verdict'] = '無法判斷（用神缺失）'
+        results['confidence'] = 'low'
+    elif sheng_count == total:
+        results['verdict'] = '大吉，一定考上'
+        results['confidence'] = 'high'
+    elif sheng_count > ke_count:
+        results['verdict'] = '偏吉，有機會考上'
+        results['confidence'] = 'medium'
+    elif ke_count == total:
+        results['verdict'] = '凶，考不上'
+        results['confidence'] = 'high'
+    else:
+        results['verdict'] = '偏凶，需努力'
+        results['confidence'] = 'medium'
+    
+    # 附加: 年干和天輔星同宮=雙重印證
+    if year_pal and tianfu_pal and year_pal == tianfu_pal:
+        results['steps'].append({
+            'step': 4, 'check': '特殊情況',
+            'detail': f'年干與天輔星同落{GONG_BAGUA[year_pal]}{year_pal}宮 → 雙重印證',
+        })
+    
+    return results
+
+def _get_year_gan(dt):
+    """取得年干"""
+    # 簡化: 2024=甲, 2025=乙, 2026=丙 ...
+    return TIANGAN[(dt.year - 4) % 10]
+
+# === D. 每日最佳時間方位預測 ===
+SHICHEN_LIST = [
+    ('子時', 23, 1), ('丑時', 1, 3), ('寅時', 3, 5), ('卯時', 5, 7),
+    ('辰時', 7, 9), ('巳時', 9, 11), ('午時', 11, 13), ('未時', 13, 15),
+    ('申時', 15, 17), ('酉時', 17, 19), ('戌時', 19, 21), ('亥時', 21, 23),
+]
+
+def best_time_direction(dt):
+    """計算某天每個時辰的最佳方位和評分
+    dt: datetime（日期）
+    返回 [(時辰名, 時間範圍, 最佳宮位, 方位, 評分, 盤局), ...] 按評分降序
+    """
+    results = []
+    for sc_name, start_h, end_h in SHICHEN_LIST:
+        try:
+            h = start_h if start_h != 23 else 23
+            test_dt = dt.replace(hour=h, minute=0)
+            r = qiju_v2(test_dt)
+            best_p = max(r['scores'], key=r['scores'].get)
+            best_sc = r['scores'][best_p]
+            results.append({
+                'shichen': sc_name,
+                'time_range': f'{start_h:02d}:00-{end_h:02d}:00',
+                'best_palace': best_p,
+                'fangwei': GONG_BAGUA[best_p],
+                'score': best_sc,
+                'r': r,
+            })
+        except Exception as e:
+            results.append({
+                'shichen': sc_name, 'time_range': f'{start_h:02d}:00-{end_h:02d}:00',
+                'best_palace': 0, 'fangwei': '?', 'score': -999, 'error': str(e),
+            })
+    results.sort(key=lambda x: x['score'], reverse=True)
+    return results
+
+def weekly_forecast(start_date, days=7):
+    """一周每日最佳時間方位預測
+    start_date: datetime 起始日期
+    days: 天數（默認7天）
+    """
+    from datetime import timedelta
+    week_names = ['星期一','星期二','星期三','星期四','星期五','星期六','星期日']
+    forecast = []
+    for i in range(days):
+        dt = start_date + timedelta(days=i)
+        day_results = best_time_direction(dt)
+        best = day_results[0] if day_results else None
+        worst = day_results[-1] if day_results else None
+        
+        # 判斷是否「大事勿用」
+        all_bad = all(d['score'] < -2.0 for d in day_results if 'score' in d)
+        has_good = any(d['score'] >= 2.0 for d in day_results if 'score' in d)
+        
+        day_info = {
+            'date': dt.strftime('%Y-%m-%d'),
+            'weekday': week_names[dt.weekday()],
+            'dgz': day_ganzhi(dt)[0] if day_results else '?',
+            'best': best,
+            'worst': worst,
+            'all_bad': all_bad,
+            'has_good': has_good,
+            'advice': '',
+        }
+        
+        if all_bad:
+            day_info['advice'] = '大事勿用，建議休息'
+        elif best and best['score'] >= 3.0:
+            day_info['advice'] = f'最適合做大事: {best["shichen"]}({best["time_range"]}) 往{best["fangwei"]}方位'
+        elif best:
+            day_info['advice'] = f'較好: {best["shichen"]}({best["time_range"]}) 往{best["fangwei"]}方位'
+        
+        forecast.append(day_info)
+    
+    # 排名: 最適合做大事的日子
+    ranked = sorted(forecast, key=lambda d: d['best']['score'] if d['best'] else -999, reverse=True)
+    forecast_ranked = [f['date'] + ' ' + f['weekday'] for f in ranked if not f['all_bad']]
+    
+    return {
+        'forecast': forecast,
+        'best_days': forecast_ranked[:3],
+        'worst_days': [f['date'] + ' ' + f['weekday'] for f in ranked if f['all_bad']],
+    }
+
+def print_weekly_forecast(wf):
+    """格式化輸出每周預測"""
+    print('')
+    print('=' * 60)
+    print('  每周最佳時間方位預測')
+    print('=' * 60)
+    for day in wf['forecast']:
+        date_str = day['date'] + ' ' + day['weekday'] + ' (' + day['dgz'] + ')'
+        print('  ' + date_str)
+        if day['all_bad']:
+            print('    ' + day['advice'])
+        elif day['best']:
+            b = day['best']
+            print('    best: ' + b['shichen'] + ' (' + b['time_range'] + ') -> ' + b['fangwei'] + ' [' + str(b['score']) + ']')
+        print('    ' + day['advice'])
+    if wf['best_days']:
+        print('  best_days: ' + ' '.join(wf['best_days']))
+    if wf['worst_days']:
+        print('  worst_days: ' + ' '.join(wf['worst_days']))
+    print('=' * 60)
