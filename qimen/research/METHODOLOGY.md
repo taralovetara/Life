@@ -224,11 +224,131 @@ For each shichen boundary (every 2 hours):
 
 ---
 
-## 2. Data Collection & Preparation
+## 2. Alpha Factor Library（Alpha 因子庫）
+
+> ⚠️ Phase 1 嘅工作，Phase 0 完成後先開始。以下為因子設計邏輯，數據收集時按此清單計算。
+
+### 2.1 因子架構總覽
+
+```
+                    ┌─────────────────────────┐
+                    │    Alpha Factor Library  │
+                    └───────────┬─────────────┘
+                ┌───────┬───────┼───────┬───────┐
+                ↓       ↓       ↓       ↓       ↓
+           Layer 1  Layer 2  Layer 3  Layer 4
+           QSI 信號  技術指標  價格衍生  宏觀因子
+           (8 個)   (10 個)   (8 個)   (6 個)
+                └───────┴───────┴───────┘
+                          ↓
+                   Total: 32 factors
+                          ↓
+            ┌─────────────────────────────┐
+            │  Feature Matrix (n × 32)    │
+            │  n ≈ 40,000 observations     │
+            └─────────────────────────────┘
+```
+
+### 2.2 Layer 1：QSI 信號因子（核心研究對象）
+
+| 因子名稱 | 來源 | 範圍 | 說明 |
+|----------|------|------|------|
+| `qsi_total` | engine.py | [-10, +8] | QSI 總分（主要信號） |
+| `qsi_star` | engine.py | [-3, +3] | 星分（九星對用神嘅影響） |
+| `qsi_gate` | engine.py | [-3, +3] | 門分（八門對用神嘅影響） |
+| `qsi_deity` | engine.py | [-2, +2] | 神分（八神對用神嘅影響） |
+| `qsi_wuxing` | engine.py | [-2, +2] | 干支五行生剋分 |
+| `qsi_pattern` | engine.py | [-3, +3] | 格局加分（吉格/凶格） |
+| `qsi_void` | engine.py | [-2, 0] | 空亡懲罰 |
+| `qsi_fuyin` | engine.py | [-1, 0] | 伏吟懲罰 |
+
+> **拆成 8 個 sub-factor 嘅原因**：Phase 3 可以做 ablation study，
+> 睇邊個 component 對預測力貢獻最大，唔好只依賴一個總分。
+
+### 2.3 Layer 2：傳統技術指標因子（Baseline / Benchmark）
+
+| 因子名稱 | 計算方式 | 類別 | 選擇理由 |
+|----------|---------|------|----------|
+| `rsi_14` | RSI(Close, 14) | 動量 | 最基礎嘅超買超賣指標，業界標準 |
+| `macd_hist` | MACD_hist(Close, 12, 26, 9) | 動量 | MACD 柱狀圖，捕捉動量變化 |
+| `macd_signal` | MACD_signal(Close, 12, 26, 9) | 動量 | MACD 信號線，趨勢方向 |
+| `adx_14` | ADX(High, Low, Close, 14) | 趨勢強度 | 區分趨勢市/盤整市 |
+| `ema_50_slope` | (EMA50 - EMA50_prev) / EMA50 | 趨勢 | 短期趨勢方向同斜率 |
+| `ema_200_slope` | (EMA200 - EMA200_prev) / EMA200 | 趨勢 | 長期趨勢方向同斜率 |
+| `bb_position` | (Close - BB_lower) / (BB_upper - BB_lower) | 波動率 | 價格喺布林帶嘅相對位置 [0,1] |
+| `atr_14` | ATR(High, Low, Close, 14) | 波動率 | 當前波動幅度（pips） |
+| `stoch_k` | Stoch_K(High, Low, Close, 14, 3) | 動量 | 隨機指標 K 值 [0,100] |
+| `volume_ratio` | Volume / SMA(Volume, 20) | 量能 | 當前成交量 / 20期均量 |
+
+### 2.4 Layer 3：價格衍生因子（從 OHLC 計算）
+
+| 因子名稱 | 計算方式 | 選擇理由 |
+|----------|---------|----------|
+| `return_1h` | (Close - Open) / Open | 上 1 小時即時回報 |
+| `return_4h` | (Close - Close_4h_ago) / Close_4h_ago | 上 4 小時回報（捕捉較長趨勢） |
+| `high_low_range` | (High - Low) / Close | 1 小時內真實波幅 |
+| `upper_shadow` | (High - max(Open, Close)) / Close | 上影線比例（拋壓指標） |
+| `lower_shadow` | (min(Open, Close) - Low) / Close | 下影線比例（支撐指標） |
+| `close_vs_ema50` | (Close - EMA50) / EMA50 | 偏離短期均線幅度 |
+| `close_vs_ema200` | (Close - EMA200) / EMA200 | 偏離長期均線幅度 |
+| `candle_body_ratio` | abs(Close - Open) / (High - Low) | K 線實體佔總波幅比例（趨勢確認） |
+
+### 2.5 Layer 4：宏觀因子（可選，Phase 3 後期加入）
+
+| 因子名稱 | 來源 | 頻率 | 選擇理由 |
+|----------|------|------|----------|
+| `vix` | CBOE | 日線→forward fill | 全球風險偏好基準 |
+| `dxy_return` | Bloomberg / FRED | 日線→forward fill | 美元強弱直接影響 EUR/USD |
+| `us_10y_change` | FRED | 日線→forward fill | 利率環境變化 |
+| `spread_2y10y` | FRED | 日線→forward fill | 收益率曲線（經濟預期） |
+| `hour_of_day` | 時鐘 | — | 亞洲/歐洲/美國時段效應 |
+| `day_of_week` | 日曆 | — | 星期效應（週五收倉等） |
+
+> **為什麼宏觀因子放喺第四層？**
+> - 頻率低（日線），同 1H 交易粒度唔匹配
+> - 前三層已經有 26 個因子，足夠 Phase 3 使用
+> - 先用前三層跑通，再睇加宏觀因子有冇顯著提升
+> - 如果加咗都無提升 → 節省計算資源，避免過擬合
+
+### 2.6 ML 實驗中嘅因子組合方案
+
+```
+Model A（Baseline — 唔含 QSI）：
+  Layer 2（10 個）+ Layer 3（8 個）= 18 個因子
+  用途：建立傳統方法嘅性能基準線
+
+Model B（Enhanced — 含 QSI 總分）：
+  Model A + qsi_total = 19 個因子
+  用途：測試 QSI 作為單一因子嘅增量價值
+
+Model C（QSI-full — 含全部 QSI 拆解）：
+  Model A + Layer 1 全部（8 個）= 26 個因子
+  用途：測試 QSI 全部 sub-component 嘅增量價值
+
+Model D（QSI-only — 極簡版）：
+  只有 qsi_total 1 個因子
+  用途：QSI 單獨預測力下限測試
+
+Model E（QSI-components only — 拆解版）：
+  只有 Layer 1 嘅 7 個 sub-component（排除 qsi_total）
+  用途：邊個 QSI component 最有預測力
+```
+
+### 2.7 因子選擇原則
+
+1. **唔選太多** — 26 個因子已經夠，太多會過擬合（尤其 ~40,000 樣本量）
+2. **每個因子都有明確嘅金融邏輯** — 唔係隨便塞數據湊數
+3. **Layer 2 + 3 係業界標準** — 如果 QSI 連呢啲都打唔贏，就無增量價值可言
+4. **Layer 1 係研究對象** — 重點唔係佢一定贏，而係有冇「增量」貢獻
+5. **Layer 4 後加** — 避免一開始就過度複雜
+
+---
+
+## 3. Data Collection & Preparation
 
 > ⚠️ Phase 1 嘅工作，Phase 0 完成後先開始。
 
-### 2.1 FX Price Data
+### 3.1 FX Price Data
 
 | Parameter | Specification |
 |-----------|--------------|
@@ -239,7 +359,7 @@ For each shichen boundary (every 2 hours):
 | Format | CSV: Date, Time, Open, High, Low, Close, Volume |
 | Timezone | UTC (convert QMDJ from UTC+8) |
 
-### 2.2 QSI Signal Data
+### 3.2 QSI Signal Data
 
 | Parameter | Specification |
 |-----------|--------------|
@@ -247,34 +367,9 @@ For each shichen boundary (every 2 hours):
 | Period | Matches FX data (2015-2025) |
 | Frequency | Every shichen (2 hours) → 12 signals/day |
 | Total signals | ~48,000 per currency pair (11 years × 365 days × 12/day) |
-| Output | Single float value per shichen per currency pair |
+| Output | 8 sub-component values + 1 total score per shichen per pair |
 
-### 2.3 Technical Indicators (Benchmark Features)
-
-All calculated from 1-hour OHLC:
-
-| Indicator | Parameters | Purpose |
-|-----------|-----------|---------|
-| RSI | Period 14 | Momentum / Overbought-Oversold |
-| MACD | 12, 26, 9 | Trend direction & momentum |
-| ADX | Period 14 | Trend strength |
-| Bollinger Bands | 20, 2 | Volatility & mean reversion |
-| EMA | 50, 100, 200 | Trend direction |
-| ATR | Period 14 | Volatility measurement |
-| Stochastic | 14, 3, 3 | Momentum oscillator |
-| Volume | Raw & 20-period MA | Volume confirmation |
-
-### 2.4 Macro Features (Optional Enhancement)
-
-| Feature | Source | Frequency |
-|---------|--------|-----------|
-| VIX | CBOE | Daily |
-| US 10Y Yield | FRED | Daily |
-| DXY Index | Bloomberg | Daily |
-| ECB Rate Decision | Event calendar | Event-based |
-| NFP Event | Event calendar | Event-based |
-
-### 2.5 Data Preprocessing
+### 3.3 Data Preprocessing
 
 ```python
 # Pseudocode for data preparation
@@ -392,11 +487,22 @@ Additional analysis:
 
 **Models**:
 ```
-Model A (Baseline):  Technical indicators only
-  Features: [RSI, MACD_signal, ADX, BB_position, EMA_slope, ATR, Stoch_K, Volume_ratio]
+Model A (Baseline):  Layer 2 + Layer 3 = 18 factors
+  Features: [rsi_14, macd_hist, macd_signal, adx_14, ema_50_slope, ema_200_slope,
+            bb_position, atr_14, stoch_k, volume_ratio,
+            return_1h, return_4h, high_low_range, upper_shadow, lower_shadow,
+            close_vs_ema50, close_vs_ema200, candle_body_ratio]
 
-Model B (Enhanced): Technical indicators + QSI
-  Features: [RSI, MACD_signal, ADX, BB_position, EMA_slope, ATR, Stoch_K, Volume_ratio, QSI]
+Model B (Enhanced):  Model A + qsi_total = 19 factors
+  Features: Model A features + [qsi_total]
+
+Model C (QSI-full): Model A + Layer 1 all 8 sub-factors = 26 factors
+  Features: Model A features + [qsi_total, qsi_star, qsi_gate, qsi_deity,
+            qsi_wuxing, qsi_pattern, qsi_void, qsi_fuyin]
+
+Model D (QSI-only): [qsi_total] only = 1 factor
+Model E (QSI-components): [qsi_star, qsi_gate, qsi_deity, qsi_wuxing,
+                            qsi_pattern, qsi_void, qsi_fuyin] = 7 factors
 ```
 
 **ML Algorithms tested** (each applied to both Model A and Model B):
