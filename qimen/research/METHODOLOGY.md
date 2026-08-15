@@ -4,6 +4,92 @@
 
 ---
 
+## 0. Master Logic Flow (核心邏輯鏈)
+
+> **原則：每一步必須通過先可以進入下一步。前面唔通，後面全部無意義。**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Phase 0: 邏輯整理（而家做緊嘅階段）                       │
+│  - 確定 QSI 評分公式每個 component 嘅定義同權重           │
+│  - 確定用神（Yong Shen）映射規則                          │
+│  - 確定入場/出場規則                                       │
+│  - 確定數據需求同來源                                      │
+│  - 確定 ML 實驗設計                                        │
+│  ✅ 產出：呢份 METHODOLOGY.md                             │
+└───────────────────────┬─────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────────┐
+│  Phase 1: 數據收集                                        │
+│  - 收集 FX OHLC 歷史數據（1H, 2015-2025）                  │
+│  - 批量生成 QSI 信號（engine.py）                         │
+│  - 計算技術指標（RSI, MACD, ADX...）                      │
+│  - 合併成 Feature Matrix                                  │
+│  ✅ 產出：合併後嘅 CSV / Parquet 數據集                    │
+└───────────────────────┬─────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────────┐
+│  Phase 2: Gatekeeper Backtest（關門測試）                   │
+│                                                          │
+│  ⚠️ 呢一步係整個研究嘅生死線                               │
+│                                                          │
+│  用最簡單嘅規則測試 QSI 本身有冇預測力：                     │
+│  - QSI ≥ +2 → 做多 2 小時                                 │
+│  - QSI ≤ -2 → 做空 2 小時                                 │
+│  - -2 < QSI < +2 → 不開倉                                │
+│                                                          │
+│  必須通過以下全部門檻先可以繼續：                            │
+│  ✅ 勝率 > 52%（顯著高於隨機嘅 50%）                       │
+│  ✅ p-value < 0.05（勝率顯著性檢驗）                       │
+│  ✅ 盈虧比 > 1:1                                          │
+│  ✅ 樣本量 > 1,000 宗交易                                  │
+│  ✅ Max Drawdown < 20%                                    │
+│                                                          │
+│  如果唔通過 → 回去 Phase 0 調整評分公式/權重，重新設計        │
+│  如果調整後都唔通過 → 研究方向需要重新評估                    │
+│                                                          │
+│  ✅ 產出：Backtest Report（勝率、盈虧比、DD、p-value）      │
+└───────────────────────┬─────────────────────────────────┘
+                        ↓ 通過 Gatekeeper
+┌─────────────────────────────────────────────────────────┐
+│  Phase 3: ML 增量價值測試                                  │
+│                                                          │
+│  ⚠️ 呢一步嘅前提：Phase 2 已經證明 QSI 有基本預測力         │
+│                                                          │
+│  目的：ML 唔係無中生有，而係將一個有 55% 勝率嘅指標            │
+│       提升到 60-65%，同時過濾掉假信號                        │
+│                                                          │
+│  - Model A：傳統技術指標 only                              │
+│  - Model B：傳統技術指標 + QSI                             │
+│  - 比較 AUC、Sharpe、Win Rate                              │
+│  - DeLong test 檢驗 ΔAUC 顯著性                            │
+│                                                          │
+│  ✅ 產出：Model A vs Model B 比較報告                      │
+└───────────────────────┬─────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────────┐
+│  Phase 4: 風險量化分析                                     │
+│  - VaR, CVaR, Max Drawdown, Sharpe, Sortino              │
+│  - 按市場狀態（趨勢/盤整/高波/低波）分層分析                 │
+│  - 按 QSI 信號強度分層分析                                 │
+│  - SHAP feature importance                                │
+│  - Ablation study（消融實驗）                              │
+│  ✅ 產出：風險報告 + 論文結果章節                            │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 關鍵邏輯原則
+
+1. **Garbage In, Garbage Out** — QSI 如果連最簡單嘅 backtest 都過唔到（勝率 ≤ 52%），ML 再強都幫唔到手。Phase 2 係生死線。
+
+2. **ML 嘅角色係「放大器」唔係「創造者」** — ML 可以將一個微弱但真實嘅信號（55% 勝率）放大提升，但唔可以憑空創造出一個不存在的信號。
+
+3. **先證明有用，先优化** — 唔好一開始就跑 XGBoost / LSTM。先用最簡單嘅規則 backtest 證明 QSI 有基本價值，先好投入 ML 資源。
+
+4. **每一步都有明確嘅通過/不通過標準** — 唔含糊，唔 self-deceive。不通過就回去改，唔好勉強繼續。
+
+---
+
 ## 1. Signal Construction
 
 ### 1.1 Qimen Dunjia Engine Specification
@@ -58,7 +144,33 @@ Step 10: Scoring & Output
   - Apply scoring formula → QSI(t)
 ```
 
-### 1.2 Scoring Formula
+### 1.2 用神（Yong Shen）映射規則
+
+> ⚠️ 呢一部分係尚未最終確定嘅，需要進一步研究同校準。
+
+QSI 嘅評分依賴「用神」嘅選擇 — 即係「問邊個宮位嘅咩元素」。
+
+**目前嘅假設（以 EUR/USD 為例）：**
+
+```
+EUR/USD 做多（睇升）：
+  用神 = 生門（Growth Gate）+ 金宮（Metal Palace: 乾6 / 兌7）
+  邏輯：EUR 屬金，生門代表增長，金宮得生 = EUR 有力向上
+
+EUR/USD 做空（睇跌）：
+  用神 = 驚門（Fear Gate）或 死門（Death Gate）+ 金宮
+  邏輯：金宮受壓制 = EUR 向下
+```
+
+**待確定嘅問題：**
+- EUR 真係屬金嗎？定係要按五行納音嚟定？
+- USD 嘅五行屬性點樣納入？
+- 不同貨幣對嘅用神映射表需要系統性建立
+- 用神選擇嘅理論依據需要引用 QMDJ 原典
+
+**目標：喺 Phase 0 完成前，確定所有主要貨幣對嘅用神映射規則。**
+
+### 1.3 Scoring Formula
 
 For a specific trading question (e.g., "Will EUR/USD rise in the next 1-2 hours?"), the engine identifies the relevant yong shen (用神) and computes:
 
@@ -90,9 +202,12 @@ Component 6: Pattern Bonus (格局加分)
   - Inauspicious patterns detected → -1 to -3
 
 Total Range: approximately [-10, +8]
+
+⚠️ 待確定：各 component 嘅具體數值（+2, -1, -2 等）需要通過
+   Phase 2 backtest 結果反向校準，唔可以只靠理論推斷。
 ```
 
-### 1.3 Time-Series Alignment
+### 1.4 Time-Series Alignment
 
 ```
 For each shichen boundary (every 2 hours):
@@ -110,6 +225,8 @@ For each shichen boundary (every 2 hours):
 ---
 
 ## 2. Data Collection & Preparation
+
+> ⚠️ Phase 1 嘅工作，Phase 0 完成後先開始。
 
 ### 2.1 FX Price Data
 
@@ -193,6 +310,51 @@ test  = df[df['date'] >= '2024-01-01']   # 2 years out-of-sample testing
 
 ## 3. Experimental Design
 
+> **重要提醒：Phase 3（ML 實驗）必須等 Phase 2（Gatekeeper Backtest）通過先可以開始。**
+
+### Phase 2 實驗：Gatekeeper Backtest
+
+**目的**：用最簡單嘅規則，測試 QSI 本身有冇基本預測力。
+
+**規則**：
+```
+QSI ≥ +2  →  做多，持倉 2 小時（1 個時辰）
+QSI ≤ -2  →  做空，持倉 2 小時
+-2 < QSI < +2  →  不開倉
+
+每宗交易：
+  - 入場價 = 信號觸發時辰嘅開盤價
+  - 出場價 = 2 小時後嘅收盤價
+  - 固定 SL = 30 pips, 固定 TP = 60 pips（可選）
+  - 或唔設 SL/TP，只按持倉時間出場
+```
+
+**門檻（全部必須通過）：**
+
+| 門檻 | 最低標準 | 說明 |
+|------|---------|------|
+| 勝率 | > 52% | 顯著高於隨機嘅 50% |
+| p-value | < 0.05 | 勝率嘅統計顯著性（二項式檢驗）|
+| 盈虧比 | > 1:1 | 平均贏 > 平均輸 |
+| 樣本量 | > 1,000 宗 | 確保統計力夠 |
+| Max Drawdown | < 20% | 風險可控 |
+| Sharpe Ratio | > 0.5 | 風險調整後有正回報 |
+
+**如果唔通過嘅處理方案：**
+```
+1. 調整評分公式中各 component 嘅權重/分數
+2. 調整入場閾值（例如從 ±2 改為 ±3）
+3. 加入額外嘅過濾條件（例如 ADX > 25）
+4. 重新檢查用神映射規則是否正確
+5. 如果以上全部試過都唔通過 → 研究方向需要根本性重新評估
+```
+
+---
+
+### Phase 3 實驗：ML 增量價值測試
+
+> **前提：Phase 2 Gatekeeper 已經通過，QSI 已證明有基本預測力。**
+
 ### 3.1 Experiment 1: QSI Univariate Predictive Power
 
 **Objective**: Test whether QSI alone can predict directional price movement.
@@ -220,6 +382,9 @@ Additional analysis:
 ```
 
 **Decision rule**: If p-value < 0.05 on QSI coefficient AND AUC > 0.52, proceed to Experiment 2.
+
+> 注意：如果 Phase 2 Gatekeeper 已經通過，呢一步理論上應該也會通過，
+> 因為 logistic regression 只係將 QSI threshold 變成概率模型。
 
 ### 3.2 Experiment 2: Incremental Information Value (CRITICAL)
 
