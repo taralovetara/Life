@@ -21,7 +21,7 @@
                         ↓
 ┌─────────────────────────────────────────────────────────┐
 │  Phase 1: 數據收集                                        │
-│  - 收集 FX OHLC 歷史數據（1H, 2015-2025）                  │
+│  - 收集 FX OHLC 歷史數據（**2H**, 2015-2025）                │
 │  - 批量生成 QSI 信號（engine.py）                         │
 │  - 計算技術指標（RSI, MACD, ADX...）                      │
 │  - 合併成 Feature Matrix                                  │
@@ -241,11 +241,14 @@ For each shichen boundary (every 2 hours):
            (8 個)   (10 個)   (8 個)   (6 個)
                 └───────┴───────┴───────┘
                           ↓
-                   Total: 32 factors
+                   Total: 32 factors (26 for Phase 3, +6 macro optional)
                           ↓
             ┌─────────────────────────────┐
-            │  Feature Matrix (n × 32)    │
-            │  n ≈ 40,000 observations     │
+            │  Feature Matrix (n × 26)     │
+            │  n ≈ 24,000 observations     │
+            │  (11 years × 12 signals/day  │
+            │   × ~200 trading days/year)  │
+            │  All computed on 2H candles  │
             └─────────────────────────────┘
 ```
 
@@ -269,29 +272,29 @@ For each shichen boundary (every 2 hours):
 
 | 因子名稱 | 計算方式 | 類別 | 選擇理由 |
 |----------|---------|------|----------|
-| `rsi_14` | RSI(Close, 14) | 動量 | 最基礎嘅超買超賣指標，業界標準 |
-| `macd_hist` | MACD_hist(Close, 12, 26, 9) | 動量 | MACD 柱狀圖，捕捉動量變化 |
-| `macd_signal` | MACD_signal(Close, 12, 26, 9) | 動量 | MACD 信號線，趨勢方向 |
-| `adx_14` | ADX(High, Low, Close, 14) | 趨勢強度 | 區分趨勢市/盤整市 |
-| `ema_50_slope` | (EMA50 - EMA50_prev) / EMA50 | 趨勢 | 短期趨勢方向同斜率 |
-| `ema_200_slope` | (EMA200 - EMA200_prev) / EMA200 | 趨勢 | 長期趨勢方向同斜率 |
-| `bb_position` | (Close - BB_lower) / (BB_upper - BB_lower) | 波動率 | 價格喺布林帶嘅相對位置 [0,1] |
-| `atr_14` | ATR(High, Low, Close, 14) | 波動率 | 當前波動幅度（pips） |
-| `stoch_k` | Stoch_K(High, Low, Close, 14, 3) | 動量 | 隨機指標 K 值 [0,100] |
-| `volume_ratio` | Volume / SMA(Volume, 20) | 量能 | 當前成交量 / 20期均量 |
+| `rsi_14` | RSI(Close, 14) on 2H | 動量 | 最基礎嘅超買超賣指標，業界標準 |
+| `macd_hist` | MACD_hist(Close, 12, 26, 9) on 2H | 動量 | MACD 柱狀圖，捕捉動量變化 |
+| `macd_signal` | MACD_signal(Close, 12, 26, 9) on 2H | 動量 | MACD 信號線，趨勢方向 |
+| `adx_14` | ADX(High, Low, Close, 14) on 2H | 趨勢強度 | 區分趨勢市/盤整市 |
+| `ema_50_slope` | (EMA50 - EMA50_prev) / EMA50 on 2H | 趨勢 | 短期趨勢方向同斜率 |
+| `ema_200_slope` | (EMA200 - EMA200_prev) / EMA200 on 2H | 趨勢 | 長期趨勢方向同斜率 |
+| `bb_position` | (Close - BB_lower) / (BB_upper - BB_lower) on 2H | 波動率 | 價格喺布林帶嘅相對位置 [0,1] |
+| `atr_14` | ATR(High, Low, Close, 14) on 2H | 波動率 | 當前波動幅度（pips） |
+| `stoch_k` | Stoch_K(High, Low, Close, 14, 3) on 2H | 動量 | 隨機指標 K 值 [0,100] |
+| `volume_ratio` | Volume / SMA(Volume, 20) on 2H | 量能 | 當前成交量 / 20期均量 |
 
 ### 2.4 Layer 3：價格衍生因子（從 OHLC 計算）
 
 | 因子名稱 | 計算方式 | 選擇理由 |
 |----------|---------|----------|
-| `return_1h` | (Close - Open) / Open | 上 1 小時即時回報 |
-| `return_4h` | (Close - Close_4h_ago) / Close_4h_ago | 上 4 小時回報（捕捉較長趨勢） |
-| `high_low_range` | (High - Low) / Close | 1 小時內真實波幅 |
-| `upper_shadow` | (High - max(Open, Close)) / Close | 上影線比例（拋壓指標） |
-| `lower_shadow` | (min(Open, Close) - Low) / Close | 下影線比例（支撐指標） |
-| `close_vs_ema50` | (Close - EMA50) / EMA50 | 偏離短期均線幅度 |
-| `close_vs_ema200` | (Close - EMA200) / EMA200 | 偏離長期均線幅度 |
-| `candle_body_ratio` | abs(Close - Open) / (High - Low) | K 線實體佔總波幅比例（趨勢確認） |
+| `return_2h` | (Close - Open) / Open on 2H | 當個 2H K 線嘅即時回報 |
+| `return_6h` | (Close - Close_3bars_ago) / Close_3bars_ago on 2H | 過去 6 小時回報（3 支 2H K 線） |
+| `high_low_range` | (High - Low) / Close on 2H | 2 小時內真實波幅 |
+| `upper_shadow` | (High - max(Open, Close)) / Close on 2H | 上影線比例（拋壓指標） |
+| `lower_shadow` | (min(Open, Close) - Low) / Close on 2H | 下影線比例（支撐指標） |
+| `close_vs_ema50` | (Close - EMA50) / EMA50 on 2H | 偏離短期均線幅度 |
+| `close_vs_ema200` | (Close - EMA200) / EMA200 on 2H | 偏離長期均線幅度 |
+| `candle_body_ratio` | abs(Close - Open) / (High - Low) on 2H | K 線實體佔總波幅比例（趨勢確認） |
 
 ### 2.5 Layer 4：宏觀因子（可選，Phase 3 後期加入）
 
@@ -305,7 +308,7 @@ For each shichen boundary (every 2 hours):
 | `day_of_week` | 日曆 | — | 星期效應（週五收倉等） |
 
 > **為什麼宏觀因子放喺第四層？**
-> - 頻率低（日線），同 1H 交易粒度唔匹配
+> - 頻率低（日線），同 2H 交易粒度唔完全匹配
 > - 前三層已經有 26 個因子，足夠 Phase 3 使用
 > - 先用前三層跑通，再睇加宏觀因子有冇顯著提升
 > - 如果加咗都無提升 → 節省計算資源，避免過擬合
@@ -336,7 +339,7 @@ Model E（QSI-components only — 拆解版）：
 
 ### 2.7 因子選擇原則
 
-1. **唔選太多** — 26 個因子已經夠，太多會過擬合（尤其 ~40,000 樣本量）
+1. **唔選太多** — 26 個因子已經夠，太多會過擬合（尤其 ~24,000 樣本量）
 2. **每個因子都有明確嘅金融邏輯** — 唔係隨便塞數據湊數
 3. **Layer 2 + 3 係業界標準** — 如果 QSI 連呢啲都打唔贏，就無增量價值可言
 4. **Layer 1 係研究對象** — 重點唔係佢一定贏，而係有冇「增量」貢獻
@@ -354,10 +357,11 @@ Model E（QSI-components only — 拆解版）：
 |-----------|--------------|
 | Pairs | EUR/USD, GBP/USD, USD/JPY (primary), AUD/USD, USD/CHF (secondary) |
 | Period | January 2015 – December 2025 (11 years) |
-| Frequency | 1-hour OHLC |
+| Frequency | **2-hour OHLC**（與 QMDJ 時辰同步） |
 | Source | Dukascopy (free), Bloomberg (institutional), or OANDA API |
 | Format | CSV: Date, Time, Open, High, Low, Close, Volume |
 | Timezone | UTC (convert QMDJ from UTC+8) |
+| Note | 2H K 線時間對齊時辰：00:00, 02:00, 04:00, ..., 22:00 UTC+8 |
 
 ### 3.2 QSI Signal Data
 
@@ -366,7 +370,7 @@ Model E（QSI-components only — 拆解版）：
 | Generated by | Life/qimen/engine.py |
 | Period | Matches FX data (2015-2025) |
 | Frequency | Every shichen (2 hours) → 12 signals/day |
-| Total signals | ~48,000 per currency pair (11 years × 365 days × 12/day) |
+| Total signals | ~24,000 per currency pair (11 years × ~200 trading days × 12/day) |
 | Output | 8 sub-component values + 1 total score per shichen per pair |
 
 ### 3.3 Data Preprocessing
@@ -377,10 +381,8 @@ Model E（QSI-components only — 拆解版）：
 df = merge(fx_ohlc, qsi_signals, technical_indicators, macro_features)
 
 # Feature engineering
-df['target_1h'] = df['close'].shift(-1) / df['close'] - 1  # 1-hour forward return
-df['target_2h'] = df['close'].shift(-2) / df['close'] - 1  # 2-hour forward return
-df['target_binary_1h'] = (df['target_1h'] > 0).astype(int)
-df['target_binary_2h'] = (df['target_2h'] > 0).astype(int)
+df['target_next_shichen'] = df['close'].shift(-1) / df['close'] - 1  # next 2H return
+df['target_binary'] = (df['target_next_shichen'] > 0).astype(int)  # up=1, down=0
 
 # QSI regime classification
 df['qsi_regime'] = pd.cut(df['qsi'],
@@ -462,7 +464,7 @@ QSI ≤ -2  →  做空，持倉 2 小時
 ```
 Model: Logistic Regression
 Features: [QSI]
-Target: target_binary_2h (up/down in next 2 hours)
+Target: target_binary (up/down in next 2H / next shichen)
 
 Metrics:
   - AUC-ROC
@@ -490,7 +492,7 @@ Additional analysis:
 Model A (Baseline):  Layer 2 + Layer 3 = 18 factors
   Features: [rsi_14, macd_hist, macd_signal, adx_14, ema_50_slope, ema_200_slope,
             bb_position, atr_14, stoch_k, volume_ratio,
-            return_1h, return_4h, high_low_range, upper_shadow, lower_shadow,
+            return_2h, return_6h, high_low_range, upper_shadow, lower_shadow,
             close_vs_ema50, close_vs_ema200, candle_body_ratio]
 
 Model B (Enhanced):  Model A + qsi_total = 19 factors
@@ -624,13 +626,13 @@ def calculate_risk_metrics(returns):
 
     # Return metrics
     metrics['total_return'] = (1 + returns).prod() - 1
-    metrics['annualized_return'] = (1 + returns.mean())**252*12 - 1  # hourly → annualized
-    metrics['volatility'] = returns.std() * np.sqrt(252*12)
+    metrics['annualized_return'] = (1 + returns.mean())**(252*12/2) - 1  # 2H → annualized
+    metrics['volatility'] = returns.std() * np.sqrt(252*12/2)
 
     # Risk-adjusted returns
     metrics['sharpe'] = metrics['annualized_return'] / metrics['volatility']
     negative_returns = returns[returns < 0]
-    metrics['sortino'] = metrics['annualized_return'] / (negative_returns.std() * np.sqrt(252*12))
+    metrics['sortino'] = metrics['annualized_return'] / (negative_returns.std() * np.sqrt(252*12/2))
 
     # Drawdown
     cumulative = (1 + returns).cumprod()
@@ -709,7 +711,7 @@ Given multiple experiments and models, we apply:
 
 ```
 Minimum detectable effect size for ΔAUC:
-  - n ≈ 40,000 observations (11 years × 12 signals/day × ~300 trading days)
+  - n ≈ 24,000 observations (11 years × 12 signals/day × ~200 trading days)
   - With α = 0.005, power = 0.80
   - Minimum detectable ΔAUC ≈ 0.008 (0.8 percentage points)
 
